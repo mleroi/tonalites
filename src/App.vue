@@ -407,6 +407,19 @@ function dismissOverlay() {
           />
         </div>
 
+        <!-- Highlight the "1" notes -->
+        <label for="highlight-ones" class="flex cursor-pointer items-center gap-3">
+          <input
+            id="highlight-ones"
+            v-model="highlightOnes"
+            type="checkbox"
+            class="size-4 accent-neutral-800"
+          />
+          <span class="text-sm font-medium tracking-wide text-neutral-600">
+            Mettre en évidence les 1
+          </span>
+        </label>
+
         <!-- Labels -->
         <div class="flex flex-col gap-3">
           <span class="text-sm font-medium tracking-wide text-neutral-600">Libellés</span>
@@ -499,18 +512,6 @@ function dismissOverlay() {
           </div>
         </div>
 
-        <!-- Highlight the "1" notes -->
-        <label for="highlight-ones" class="flex cursor-pointer items-center gap-3">
-          <input
-            id="highlight-ones"
-            v-model="highlightOnes"
-            type="checkbox"
-            class="size-4 accent-neutral-800"
-          />
-          <span class="text-sm font-medium tracking-wide text-neutral-600">
-            Mettre en évidence les 1
-          </span>
-        </label>
         </div>
 
         <!-- Column 2: scale, play mode, drone, display -->
@@ -611,54 +612,6 @@ function dismissOverlay() {
           </div>
         </div>
 
-        <!-- Drone -->
-        <div class="flex flex-col gap-3">
-          <label for="drone" class="flex cursor-pointer items-center gap-3">
-            <input
-              id="drone"
-              v-model="droneOn"
-              type="checkbox"
-              class="size-4 accent-neutral-800"
-            />
-            <span class="text-sm font-medium tracking-wide text-neutral-600">Drone</span>
-          </label>
-
-          <!-- Drone note and volume (only relevant when the drone is on) -->
-          <div v-if="droneOn" class="flex flex-col gap-3 pl-7">
-            <div class="flex items-baseline justify-between">
-              <label for="drone-note" class="text-sm tracking-wide text-neutral-500">
-                Note du drone
-              </label>
-              <span class="text-sm tabular-nums text-neutral-400">{{ droneNoteName }}</span>
-            </div>
-            <input
-              id="drone-note"
-              v-model.number="droneNote"
-              type="range"
-              :min="MIN_NUMBER_START"
-              :max="MAX_NUMBER_START"
-              step="1"
-              class="w-full accent-neutral-800"
-            />
-
-            <div class="flex items-baseline justify-between">
-              <label for="drone-volume" class="text-sm tracking-wide text-neutral-500">
-                Volume du drone
-              </label>
-              <span class="text-sm tabular-nums text-neutral-400">{{ droneVolume }}%</span>
-            </div>
-            <input
-              id="drone-volume"
-              v-model.number="droneVolume"
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              class="w-full accent-neutral-800"
-            />
-          </div>
-        </div>
-
         <!-- Glissando band -->
         <label for="show-glide" class="flex cursor-pointer items-center gap-3">
           <input
@@ -708,6 +661,54 @@ function dismissOverlay() {
           />
           <span class="text-sm font-medium tracking-wide text-neutral-600">Mode piano</span>
         </label>
+
+        <!-- Drone -->
+        <div class="flex flex-col gap-3">
+          <label for="drone" class="flex cursor-pointer items-center gap-3">
+            <input
+              id="drone"
+              v-model="droneOn"
+              type="checkbox"
+              class="size-4 accent-neutral-800"
+            />
+            <span class="text-sm font-medium tracking-wide text-neutral-600">Drone</span>
+          </label>
+
+          <!-- Drone note and volume (only relevant when the drone is on) -->
+          <div v-if="droneOn" class="flex flex-col gap-3 pl-7">
+            <div class="flex items-baseline justify-between">
+              <label for="drone-note" class="text-sm tracking-wide text-neutral-500">
+                Note du drone
+              </label>
+              <span class="text-sm tabular-nums text-neutral-400">{{ droneNoteName }}</span>
+            </div>
+            <input
+              id="drone-note"
+              v-model.number="droneNote"
+              type="range"
+              :min="MIN_NUMBER_START"
+              :max="MAX_NUMBER_START"
+              step="1"
+              class="w-full accent-neutral-800"
+            />
+
+            <div class="flex items-baseline justify-between">
+              <label for="drone-volume" class="text-sm tracking-wide text-neutral-500">
+                Volume du drone
+              </label>
+              <span class="text-sm tabular-nums text-neutral-400">{{ droneVolume }}%</span>
+            </div>
+            <input
+              id="drone-volume"
+              v-model.number="droneVolume"
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              class="w-full accent-neutral-800"
+            />
+          </div>
+        </div>
         </div>
       </div>
     </footer>
