@@ -3,10 +3,10 @@ import { ref, computed, watch } from 'vue'
 import Carre from './components/Carre.vue'
 import {
   noteName,
+  pitchClassName,
   isBlackKey,
   isInScale,
   INTERVALS,
-  NOTE_NAMES,
   SCALES,
   MIN_NOTE,
   MAX_NOTE,
@@ -81,6 +81,10 @@ const labelMode = ref('none')
 // 'all' = every octave. Applies to both intervals and numbers.
 const labelScope = ref('single')
 
+// How accidentals are written everywhere note names appear: 'sharps' or 'flats'.
+const accidentals = ref('sharps')
+const useFlats = computed(() => accidentals.value === 'flats')
+
 // When enabled, every "1" (the tonic and its octaves) is highlighted, even
 // when its number is not displayed.
 const highlightOnes = ref(true)
@@ -133,13 +137,13 @@ function isAudible(semitone) {
 const carres = computed(() => Array.from({ length: octaves.value * 12 }, (_, i) => i))
 
 // Name of the currently selected starting note (shown next to the slider).
-const firstNoteName = computed(() => noteName(firstNote.value))
+const firstNoteName = computed(() => noteName(firstNote.value, useFlats.value))
 
 // Name of the note that carries the "1" (shown next to its slider).
-const numberStartName = computed(() => noteName(numberStart.value))
+const numberStartName = computed(() => noteName(numberStart.value, useFlats.value))
 
 // Name of the drone note (shown next to its slider).
-const droneNoteName = computed(() => noteName(droneNote.value))
+const droneNoteName = computed(() => noteName(droneNote.value, useFlats.value))
 
 // Label to display in a square, based on its distance from `numberStart`.
 // Returns null when nothing should be displayed (no labels, or out of the
@@ -158,7 +162,7 @@ function squareLabel(semitone) {
     return null
   }
   if (labelMode.value === 'names') {
-    return NOTE_NAMES[semitone % 12]
+    return pitchClassName(semitone, useFlats.value)
   }
   const degree = (((relative % 12) + 12) % 12)
   return labelMode.value === 'intervals' ? INTERVALS[degree] : String(degree + 1)
@@ -239,7 +243,7 @@ function updateGlide(clientX, attack) {
   const nearest = Math.round(semitone)
   const noteFrequency = semitoneToFrequency(nearest)
   const onNote = Math.trunc(frequency) === Math.trunc(noteFrequency)
-  glideNoteName.value = onNote ? noteName(nearest) : ''
+  glideNoteName.value = onNote ? noteName(nearest, useFlats.value) : ''
   glideHz.value = onNote ? noteFrequency : frequency
   if (attack) {
     startGlide(frequency)
@@ -325,7 +329,7 @@ function dismissOverlay() {
             :index="i"
             :label="squareLabel(firstNote + i)"
             :mark-tonic="isOneNote(firstNote + i) && squareLabel(firstNote + i) !== null"
-            :note="noteName(firstNote + i)"
+            :note="noteName(firstNote + i, useFlats)"
             :show-note="showNotes"
             :frequency="`${Math.round(semitoneToFrequency(firstNote + i))} Hz`"
             :show-frequency="showFrequencies"
@@ -465,6 +469,33 @@ function dismissOverlay() {
               />
               <span class="text-sm text-neutral-600">Toutes les octaves</span>
             </label>
+          </div>
+
+          <!-- Accidentals: affects every note name shown in the app -->
+          <div class="flex flex-col gap-2 pt-1">
+            <span class="text-sm font-medium tracking-wide text-neutral-600">
+              Affichage des altérations
+            </span>
+            <div class="flex flex-wrap gap-x-6 gap-y-2">
+              <label class="flex cursor-pointer items-center gap-2">
+                <input
+                  v-model="accidentals"
+                  type="radio"
+                  value="sharps"
+                  class="size-4 accent-neutral-800"
+                />
+                <span class="text-sm text-neutral-600">Dièses</span>
+              </label>
+              <label class="flex cursor-pointer items-center gap-2">
+                <input
+                  v-model="accidentals"
+                  type="radio"
+                  value="flats"
+                  class="size-4 accent-neutral-800"
+                />
+                <span class="text-sm text-neutral-600">Bémols</span>
+              </label>
+            </div>
           </div>
         </div>
 

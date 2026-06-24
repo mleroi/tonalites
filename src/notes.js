@@ -14,6 +14,22 @@ export const NOTE_NAMES = [
   'Si',
 ]
 
+// Same chromatic scale written with flats instead of sharps.
+export const NOTE_NAMES_FLAT = [
+  'Do',
+  'Réb',
+  'Ré',
+  'Mib',
+  'Mi',
+  'Fa',
+  'Solb',
+  'Sol',
+  'Lab',
+  'La',
+  'Sib',
+  'Si',
+]
+
 // Lowest and highest selectable starting notes, expressed as absolute
 // semitone indices where 0 = Do1.
 export const MIN_NOTE = 0 // Do1
@@ -23,11 +39,15 @@ export const MAX_NOTE = 72 // Do7
 export const MIN_NUMBER_START = 0 // Do1
 export const MAX_NUMBER_START = 96 // Do9
 
+// Pitch class name (without octave) for an absolute semitone index.
+export function pitchClassName(semitone, useFlats = false) {
+  return (useFlats ? NOTE_NAMES_FLAT : NOTE_NAMES)[semitone % 12]
+}
+
 // Converts an absolute semitone index (0 = Do1) into its note name with octave.
-export function noteName(semitone) {
-  const name = NOTE_NAMES[semitone % 12]
+export function noteName(semitone, useFlats = false) {
   const octave = Math.floor(semitone / 12) + 1
-  return `${name}${octave}`
+  return `${pitchClassName(semitone, useFlats)}${octave}`
 }
 
 // Interval symbols for each semitone degree from the tonic (degree 0 = root).
