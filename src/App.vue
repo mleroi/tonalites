@@ -6,6 +6,7 @@ import {
   isBlackKey,
   isInScale,
   INTERVALS,
+  NOTE_NAMES,
   SCALES,
   MIN_NOTE,
   MAX_NOTE,
@@ -71,8 +72,9 @@ watch(droneNote, (n) => {
 })
 watch(droneVolume, (v) => setDroneVolume(v / 2))
 
-// Label content shown in squares: 'none', 'intervals' (R, b2, M2…) or
-// 'numbers' (1..12). Counted from the "note du 1" (degree 0).
+// Label content shown in squares: 'none', 'intervals' (R, b2, M2…),
+// 'numbers' (1..12) or 'names' (Do, Ré…). Intervals/numbers are counted from
+// the "note du 1" (degree 0); names are the absolute pitch class.
 const labelMode = ref('none')
 
 // Label scope: 'single' = only the octave starting on the "note du 1",
@@ -145,6 +147,9 @@ function squareLabel(semitone) {
   const relative = semitone - numberStart.value
   if (labelScope.value === 'single' && !(relative >= 0 && relative < 12)) {
     return null
+  }
+  if (labelMode.value === 'names') {
+    return NOTE_NAMES[semitone % 12]
   }
   const degree = (((relative % 12) + 12) % 12)
   return labelMode.value === 'intervals' ? INTERVALS[degree] : String(degree + 1)
@@ -419,6 +424,15 @@ function dismissOverlay() {
                 class="size-4 accent-neutral-800"
               />
               <span class="text-sm text-neutral-600">Numérotation</span>
+            </label>
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="labelMode"
+                type="radio"
+                value="names"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Nom des notes</span>
             </label>
           </div>
 

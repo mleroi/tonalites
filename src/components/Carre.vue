@@ -110,7 +110,7 @@ const labelClasses = computed(() =>
       <!-- Font size scales with the square width (cqw); hidden once too small. -->
       <span
         v-if="label !== null"
-        class="hidden select-none text-[42cqw] leading-none tabular-nums @min-[24px]:block"
+        class="hidden select-none whitespace-nowrap text-[42cqw] leading-none tabular-nums @min-[24px]:block"
         :class="labelClasses"
       >
         {{ label }}
