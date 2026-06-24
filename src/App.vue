@@ -101,6 +101,10 @@ const scaleAudioMode = ref('scale-only')
 // 'all' = highlight scale notes across every octave.
 const scaleHighlightMode = ref('single')
 
+// When a scale is selected, hide the labels of squares that are not
+// highlighted (i.e. only scale notes keep their inner label).
+const hideLabelsOutOfScale = ref(true)
+
 // The currently selected scale object, or null when none is selected.
 const selectedScale = computed(() => SCALES.find((s) => s.key === scaleKey.value) || null)
 
@@ -142,6 +146,11 @@ const droneNoteName = computed(() => noteName(droneNote.value))
 // single octave when scope is 'single').
 function squareLabel(semitone) {
   if (labelMode.value === 'none') {
+    return null
+  }
+  // With a scale selected, optionally only highlighted (in-scale) squares keep
+  // their label.
+  if (selectedScale.value && hideLabelsOutOfScale.value && !isHighlighted(semitone)) {
     return null
   }
   const relative = semitone - numberStart.value
@@ -533,6 +542,15 @@ function dismissOverlay() {
                 class="size-4 accent-neutral-800"
               />
               <span class="text-sm text-neutral-600">Toutes les octaves</span>
+            </label>
+
+            <label class="flex cursor-pointer items-center gap-2 pt-1">
+              <input
+                v-model="hideLabelsOutOfScale"
+                type="checkbox"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Masquer les libellés hors gamme</span>
             </label>
           </div>
         </div>
