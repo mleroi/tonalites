@@ -123,18 +123,53 @@ const selectionNotes = computed(() =>
   selectedScale.value ? selectedScale.value.intervals.map((d) => numberStart.value + d) : [],
 )
 
-// Pending timers for the "play separately" sequence, cleared on each replay.
-let separateTimers = []
+// Pending timers for the sequential playback, cleared on each replay.
+let sequenceTimers = []
+
+// Absolute semitones currently being played, to highlight their squares.
+const playingNotes = ref(new Set())
+
+// Cancel any running playback and clear the highlight.
+function clearPlayback() {
+  sequenceTimers.forEach(clearTimeout)
+  sequenceTimers = []
+  playingNotes.value.clear()
+}
+
+// Highlight a square for a given duration (ms), then clear it.
+function flashNote(semitone, duration) {
+  playingNotes.value.add(semitone)
+  setTimeout(() => playingNotes.value.delete(semitone), duration)
+}
+
+// Play a note and briefly highlight its square.
+function playAndFlash(semitone, duration) {
+  playNote(semitone)
+  flashNote(semitone, duration)
+}
+
+// Play a list of notes one by one, 300 ms apart, highlighting each in turn.
+function playSequence(notes) {
+  clearPlayback()
+  notes.forEach((n, i) => {
+    sequenceTimers.push(setTimeout(() => playAndFlash(n, 280), i * 300))
+  })
+}
 
 // Play all selection notes at once.
 function playSelectionTogether() {
-  selectionNotes.value.forEach((n) => playNote(n))
+  clearPlayback()
+  selectionNotes.value.forEach((n) => playAndFlash(n, 600))
 }
 
-// Play the selection notes one by one, 300 ms apart.
-function playSelectionSeparately() {
-  separateTimers.forEach(clearTimeout)
-  separateTimers = selectionNotes.value.map((n, i) => setTimeout(() => playNote(n), i * 300))
+// Play the selection notes one by one, ascending.
+function playSelectionAscending() {
+  playSequence(selectionNotes.value)
+}
+
+// Play the selection notes one by one, descending.
+function playSelectionDescending() {
+  playSequence([...selectionNotes.value].reverse())
 }
 
 // True if the note belongs to the selected scale (false when no scale).
@@ -197,32 +232,39 @@ function squareLabel(semitone) {
 // rings as long as the pointer stays inside the square.
 const playMode = ref('short')
 
-// Releasing any stuck sustained note when leaving the sustain mode.
+// Releasing any stuck sustained note (and its highlight) when leaving the
+// sustain mode.
 watch(playMode, (mode) => {
-  if (mode !== 'sustain') releaseAllNotes()
+  if (mode !== 'sustain') {
+    releaseAllNotes()
+    playingNotes.value.clear()
+  }
 })
 
-// Pointer enters a square: play it (if audible) according to the play mode.
+// Pointer enters a square: play it (if audible) according to the play mode,
+// and highlight it (briefly in short mode, until leaving in sustain mode).
 function enterNote(semitone) {
   if (!isAudible(semitone)) return
   if (playMode.value === 'sustain') {
     startNote(semitone)
+    playingNotes.value.add(semitone)
   } else {
-    playNote(semitone)
+    playAndFlash(semitone, 250)
   }
 }
 
-// Pointer leaves a square: stop its sustained note (no-op in short mode).
+// Pointer leaves a square: stop and unhighlight its sustained note.
 function leaveNote(semitone) {
   if (playMode.value === 'sustain') {
     stopNote(semitone)
+    playingNotes.value.delete(semitone)
   }
 }
 
-// Mouse pressed on a square: re-strike it in short mode.
+// Mouse pressed on a square: re-strike and re-flash it in short mode.
 function pressNote(semitone) {
   if (playMode.value === 'short' && isAudible(semitone)) {
-    playNote(semitone)
+    playAndFlash(semitone, 250)
   }
 }
 
@@ -362,6 +404,7 @@ function dismissOverlay() {
             :black="isBlackKey(firstNote + i)"
             :highlighted="isHighlighted(firstNote + i)"
             :highlight-one="highlightOnes && isOneNote(firstNote + i)"
+            :playing="playingNotes.has(firstNote + i)"
             @press="pressNote(firstNote + i)"
             @enter="enterNote(firstNote + i)"
             @leave="leaveNote(firstNote + i)"
@@ -589,9 +632,15 @@ function dismissOverlay() {
             <div class="flex gap-2">
               <div
                 class="flex-1 cursor-pointer select-none rounded-md border border-neutral-200 bg-neutral-50 py-2 text-center text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-200"
-                @mouseenter="playSelectionSeparately"
+                @mouseenter="playSelectionAscending"
               >
-                Séparément
+                En montant
+              </div>
+              <div
+                class="flex-1 cursor-pointer select-none rounded-md border border-neutral-200 bg-neutral-50 py-2 text-center text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-200"
+                @mouseenter="playSelectionDescending"
+              >
+                En descendant
               </div>
               <div
                 class="flex-1 cursor-pointer select-none rounded-md border border-neutral-200 bg-neutral-50 py-2 text-center text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-200"

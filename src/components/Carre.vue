@@ -59,6 +59,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Whether this note is currently being played (transient highlight).
+  playing: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 // 'press' fires on mouse down; 'enter' fires when the pointer moves onto the
@@ -94,6 +99,9 @@ const borderClasses = computed(() => {
 const labelClasses = computed(() =>
   props.pianoMode && props.black ? 'text-neutral-300' : 'text-neutral-500',
 )
+
+// Transient highlight while the note is being played (a subtle zoom).
+const playingClasses = computed(() => (props.playing ? 'z-10 scale-110' : ''))
 </script>
 
 <template>
@@ -101,8 +109,8 @@ const labelClasses = computed(() =>
        inner number and the note label react to the rendered square size. -->
   <div class="@container flex min-w-0 flex-1 flex-col items-center gap-1">
     <div
-      class="flex aspect-square w-full cursor-pointer items-center justify-center rounded-md transition-colors duration-150"
-      :class="[backgroundClasses, borderClasses]"
+      class="flex aspect-square w-full cursor-pointer items-center justify-center rounded-md transition duration-150"
+      :class="[backgroundClasses, borderClasses, playingClasses]"
       @mousedown.prevent="emit('press')"
       @mouseenter="emit('enter')"
       @mouseleave="emit('leave')"
