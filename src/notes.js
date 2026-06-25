@@ -66,13 +66,15 @@ export function isBlackKey(semitone) {
 // (degree 0). `type` groups them in the dropdown: scale / interval / chord.
 export const SCALES = [
   // The seven modes of the major scale (rotations of one another).
-  { key: 'ionian', type: 'scale', label: 'Gamme majeure (Mode Ionien)', intervals: [0, 2, 4, 5, 7, 9, 11] },
-  { key: 'dorian', type: 'scale', label: 'Mode Dorien', intervals: [0, 2, 3, 5, 7, 9, 10] },
-  { key: 'phrygian', type: 'scale', label: 'Mode Phrygien', intervals: [0, 1, 3, 5, 7, 8, 10] },
-  { key: 'lydian', type: 'scale', label: 'Mode Lydien', intervals: [0, 2, 4, 6, 7, 9, 11] },
-  { key: 'mixolydian', type: 'scale', label: 'Mode Mixolydien', intervals: [0, 2, 4, 5, 7, 9, 10] },
-  { key: 'aeolian', type: 'scale', label: 'Gamme mineure (Mode Aéolien)', intervals: [0, 2, 3, 5, 7, 8, 10] },
-  { key: 'locrian', type: 'scale', label: 'Mode Locrien', intervals: [0, 1, 3, 5, 6, 8, 10] },
+  { key: 'ionian', type: 'scale', label: 'Gamme majeure (Mode Ionien)', intervals: [0, 2, 4, 5, 7, 9, 11, 12] },
+  { key: 'dorian', type: 'scale', label: 'Mode Dorien', intervals: [0, 2, 3, 5, 7, 9, 10, 12] },
+  { key: 'phrygian', type: 'scale', label: 'Mode Phrygien', intervals: [0, 1, 3, 5, 7, 8, 10, 12] },
+  { key: 'lydian', type: 'scale', label: 'Mode Lydien', intervals: [0, 2, 4, 6, 7, 9, 11, 12] },
+  { key: 'mixolydian', type: 'scale', label: 'Mode Mixolydien', intervals: [0, 2, 4, 5, 7, 9, 10, 12] },
+  { key: 'aeolian', type: 'scale', label: 'Gamme mineure (Mode Aéolien)', intervals: [0, 2, 3, 5, 7, 8, 10, 12] },
+  { key: 'min-harmonic', type: 'scale', label: 'Gamme mineure harmonique', intervals: [0, 2, 3, 5, 7, 8, 11, 12] },
+  { key: 'min-melodic', type: 'scale', label: 'Gamme mineure mélodique', intervals: [0, 2, 3, 5, 7, 9, 11, 12] },
+  { key: 'locrian', type: 'scale', label: 'Mode Locrien', intervals: [0, 1, 3, 5, 6, 8, 10, 12] },
 
   // Every interval from the tonic, within one octave.
   { key: 'i-min2', type: 'interval', label: 'Seconde mineure (b2)', intervals: [0, 1] },
@@ -86,6 +88,7 @@ export const SCALES = [
   { key: 'i-maj6', type: 'interval', label: 'Sixte majeure (M6)', intervals: [0, 9] },
   { key: 'i-min7', type: 'interval', label: 'Septième mineure (b7)', intervals: [0, 10] },
   { key: 'i-maj7', type: 'interval', label: 'Septième majeure (M7)', intervals: [0, 11] },
+  { key: 'i-octave', type: 'interval', label: 'Octave (8ve)', intervals: [0, 12] },
 
   // Three-note chords (triads).
   { key: 'c-maj', type: 'chord', label: 'Majeur', intervals: [0, 4, 7] },
