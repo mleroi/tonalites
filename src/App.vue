@@ -460,21 +460,21 @@ function dismissOverlay() {
             </label>
             <label class="flex cursor-pointer items-center gap-2">
               <input
+              v-model="labelMode"
+              type="radio"
+              value="numbers"
+              class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Numérotation</span>
+            </label>
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
                 v-model="labelMode"
                 type="radio"
                 value="intervals"
                 class="size-4 accent-neutral-800"
               />
               <span class="text-sm text-neutral-600">Intervalles</span>
-            </label>
-            <label class="flex cursor-pointer items-center gap-2">
-              <input
-                v-model="labelMode"
-                type="radio"
-                value="numbers"
-                class="size-4 accent-neutral-800"
-              />
-              <span class="text-sm text-neutral-600">Numérotation</span>
             </label>
             <label class="flex cursor-pointer items-center gap-2">
               <input
