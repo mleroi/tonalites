@@ -8,6 +8,7 @@ import {
   isInScale,
   INTERVALS,
   SCALES,
+  SCALE_TYPES,
   MIN_NOTE,
   MAX_NOTE,
   MIN_NUMBER_START,
@@ -111,6 +112,30 @@ const hideLabelsOutOfScale = ref(true)
 
 // The currently selected scale object, or null when none is selected.
 const selectedScale = computed(() => SCALES.find((s) => s.key === scaleKey.value) || null)
+
+// Note sets of a given type, for the grouped dropdown.
+function scalesOfType(type) {
+  return SCALES.filter((s) => s.type === type)
+}
+
+// The selection's notes, one octave from the tonic ("note du 1").
+const selectionNotes = computed(() =>
+  selectedScale.value ? selectedScale.value.intervals.map((d) => numberStart.value + d) : [],
+)
+
+// Pending timers for the "play separately" sequence, cleared on each replay.
+let separateTimers = []
+
+// Play all selection notes at once.
+function playSelectionTogether() {
+  selectionNotes.value.forEach((n) => playNote(n))
+}
+
+// Play the selection notes one by one, 300 ms apart.
+function playSelectionSeparately() {
+  separateTimers.forEach(clearTimeout)
+  separateTimers = selectionNotes.value.map((n, i) => setTimeout(() => playNote(n), i * 300))
+}
 
 // True if the note belongs to the selected scale (false when no scale).
 function inScale(semitone) {
@@ -519,15 +544,19 @@ function dismissOverlay() {
         <!-- Scale -->
         <div class="flex flex-col gap-3">
           <label for="scale" class="text-sm font-medium tracking-wide text-neutral-600">
-            Gamme
+            Gammes / Intervalles / Accords
           </label>
           <select
             id="scale"
             v-model="scaleKey"
             class="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
           >
-            <option value="">Aucune</option>
-            <option v-for="s in SCALES" :key="s.key" :value="s.key">{{ s.label }}</option>
+            <option value="">Aucun</option>
+            <optgroup v-for="g in SCALE_TYPES" :key="g.type" :label="g.label">
+              <option v-for="s in scalesOfType(g.type)" :key="s.key" :value="s.key">
+                {{ s.label }}
+              </option>
+            </optgroup>
           </select>
 
           <!-- Listening mode (only relevant when a scale is selected) -->
@@ -539,7 +568,7 @@ function dismissOverlay() {
                 value="scale-only"
                 class="size-4 accent-neutral-800"
               />
-              <span class="text-sm text-neutral-600">N'entendre que les notes de la gamme</span>
+              <span class="text-sm text-neutral-600">N'entendre que les notes de la sélection</span>
             </label>
             <label class="flex cursor-pointer items-center gap-2">
               <input
@@ -550,6 +579,27 @@ function dismissOverlay() {
               />
               <span class="text-sm text-neutral-600">Entendre toutes les notes</span>
             </label>
+          </div>
+
+          <!-- Play the selection (hover to listen) -->
+          <div v-if="selectedScale" class="flex flex-col gap-2 pt-2">
+            <span class="text-sm font-medium tracking-wide text-neutral-600">
+              Écouter la sélection
+            </span>
+            <div class="flex gap-2">
+              <div
+                class="flex-1 cursor-pointer select-none rounded-md border border-neutral-200 bg-neutral-50 py-2 text-center text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-200"
+                @mouseenter="playSelectionSeparately"
+              >
+                Séparément
+              </div>
+              <div
+                class="flex-1 cursor-pointer select-none rounded-md border border-neutral-200 bg-neutral-50 py-2 text-center text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-200"
+                @mouseenter="playSelectionTogether"
+              >
+                Ensemble
+              </div>
+            </div>
           </div>
 
           <!-- Highlight scope (only relevant when a scale is selected) -->
@@ -582,7 +632,7 @@ function dismissOverlay() {
                 type="checkbox"
                 class="size-4 accent-neutral-800"
               />
-              <span class="text-sm text-neutral-600">Masquer les libellés hors gamme</span>
+              <span class="text-sm text-neutral-600">Masquer les libellés hors sélection</span>
             </label>
           </div>
         </div>
