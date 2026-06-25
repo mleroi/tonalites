@@ -9,6 +9,7 @@ import {
   INTERVALS,
   SCALES,
   SCALE_TYPES,
+  KEYS,
   MIN_NOTE,
   MAX_NOTE,
   MIN_NUMBER_START,
@@ -85,6 +86,28 @@ const labelScope = ref('single')
 // How accidentals are written everywhere note names appear: 'sharps' or 'flats'.
 const accidentals = ref('sharps')
 const useFlats = computed(() => accidentals.value === 'flats')
+
+// Selected key ('' = none). Choosing one moves the "note du 1" to its tonic in
+// octave 4 (Do4 = semitone 36) and adapts the accidentals spelling.
+const keyChoice = ref('')
+watch(keyChoice, (k) => {
+  const key = KEYS.find((x) => x.key === k)
+  if (!key) return
+  numberStart.value = 36 + key.pitchClass
+  accidentals.value = key.accidentals
+  scaleKey.value = 'ionian' // Gamme majeure
+  labelMode.value = 'names' // Libellés : nom des notes
+})
+
+// Resynchronize: if "note du 1" or accidentals are changed by hand so they no
+// longer match the selected key, clear the key selection.
+watch([numberStart, accidentals], () => {
+  const key = KEYS.find((x) => x.key === keyChoice.value)
+  if (!key) return
+  if (numberStart.value !== 36 + key.pitchClass || accidentals.value !== key.accidentals) {
+    keyChoice.value = ''
+  }
+})
 
 // When enabled, every "1" (the tonic and its octaves) is highlighted, even
 // when its number is not displayed.
@@ -415,7 +438,7 @@ function dismissOverlay() {
 
     <!-- Controls -->
     <footer class="border-t border-neutral-100 px-6 py-8">
-      <div class="mx-auto grid max-w-3xl grid-cols-1 items-start gap-x-10 gap-y-6 md:grid-cols-2">
+      <div class="mx-auto grid max-w-6xl grid-cols-1 items-start gap-x-10 gap-y-6 md:grid-cols-2 lg:grid-cols-4">
         <!-- Column 1: notes, octaves, numbering -->
         <div class="flex flex-col gap-6">
         <!-- First note -->
@@ -582,135 +605,8 @@ function dismissOverlay() {
 
         </div>
 
-        <!-- Column 2: scale, play mode, drone, display -->
+        <!-- Column 2: display options, piano, drone -->
         <div class="flex flex-col gap-6">
-        <!-- Scale -->
-        <div class="flex flex-col gap-3">
-          <label for="scale" class="text-sm font-medium tracking-wide text-neutral-600">
-            Gammes / Intervalles / Accords
-          </label>
-          <select
-            id="scale"
-            v-model="scaleKey"
-            class="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
-          >
-            <option value="">Aucun</option>
-            <optgroup v-for="g in SCALE_TYPES" :key="g.type" :label="g.label">
-              <option v-for="s in scalesOfType(g.type)" :key="s.key" :value="s.key">
-                {{ s.label }}
-              </option>
-            </optgroup>
-          </select>
-
-          <!-- Listening mode (only relevant when a scale is selected) -->
-          <div v-if="selectedScale" class="flex flex-col gap-2 pt-1">
-            <label class="flex cursor-pointer items-center gap-2">
-              <input
-                v-model="scaleAudioMode"
-                type="radio"
-                value="scale-only"
-                class="size-4 accent-neutral-800"
-              />
-              <span class="text-sm text-neutral-600">N'entendre que les notes de la sélection</span>
-            </label>
-            <label class="flex cursor-pointer items-center gap-2">
-              <input
-                v-model="scaleAudioMode"
-                type="radio"
-                value="all"
-                class="size-4 accent-neutral-800"
-              />
-              <span class="text-sm text-neutral-600">Entendre toutes les notes</span>
-            </label>
-          </div>
-
-          <!-- Play the selection (hover to listen) -->
-          <div v-if="selectedScale" class="flex flex-col gap-2 pt-2">
-            <span class="text-sm font-medium tracking-wide text-neutral-600">
-              Écouter la sélection
-            </span>
-            <div class="flex gap-2">
-              <div
-                class="flex-1 cursor-pointer select-none rounded-md border border-neutral-200 bg-neutral-50 py-2 text-center text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-200"
-                @mouseenter="playSelectionAscending"
-              >
-                En montant
-              </div>
-              <div
-                class="flex-1 cursor-pointer select-none rounded-md border border-neutral-200 bg-neutral-50 py-2 text-center text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-200"
-                @mouseenter="playSelectionDescending"
-              >
-                En descendant
-              </div>
-              <div
-                class="flex-1 cursor-pointer select-none rounded-md border border-neutral-200 bg-neutral-50 py-2 text-center text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-200"
-                @mouseenter="playSelectionTogether"
-              >
-                Ensemble
-              </div>
-            </div>
-          </div>
-
-          <!-- Highlight scope (only relevant when a scale is selected) -->
-          <div v-if="selectedScale" class="flex flex-col gap-2 pt-2">
-            <span class="text-sm font-medium tracking-wide text-neutral-600">
-              Mise en évidence
-            </span>
-            <label class="flex cursor-pointer items-center gap-2">
-              <input
-                v-model="scaleHighlightMode"
-                type="radio"
-                value="single"
-                class="size-4 accent-neutral-800"
-              />
-              <span class="text-sm text-neutral-600">Une octave</span>
-            </label>
-            <label class="flex cursor-pointer items-center gap-2">
-              <input
-                v-model="scaleHighlightMode"
-                type="radio"
-                value="all"
-                class="size-4 accent-neutral-800"
-              />
-              <span class="text-sm text-neutral-600">Toutes les octaves</span>
-            </label>
-
-            <label class="flex cursor-pointer items-center gap-2 pt-1">
-              <input
-                v-model="hideLabelsOutOfScale"
-                type="checkbox"
-                class="size-4 accent-neutral-800"
-              />
-              <span class="text-sm text-neutral-600">Masquer les libellés hors sélection</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Play mode -->
-        <div class="flex flex-col gap-3">
-          <span class="text-sm font-medium tracking-wide text-neutral-600">Mode de jeu</span>
-          <div class="flex flex-wrap gap-x-6 gap-y-2">
-            <label class="flex cursor-pointer items-center gap-2">
-              <input
-                v-model="playMode"
-                type="radio"
-                value="short"
-                class="size-4 accent-neutral-800"
-              />
-              <span class="text-sm text-neutral-600">Note courte</span>
-            </label>
-            <label class="flex cursor-pointer items-center gap-2">
-              <input
-                v-model="playMode"
-                type="radio"
-                value="sustain"
-                class="size-4 accent-neutral-800"
-              />
-              <span class="text-sm text-neutral-600">Note tenue</span>
-            </label>
-          </div>
-        </div>
-
         <!-- Glissando band -->
         <label for="show-glide" class="flex cursor-pointer items-center gap-3">
           <input
@@ -807,6 +703,156 @@ function dismissOverlay() {
               class="w-full accent-neutral-800"
             />
           </div>
+        </div>
+        </div>
+
+        <!-- Column 3: scales/intervals/chords, play mode -->
+        <div class="flex flex-col gap-6">
+        <!-- Scale -->
+        <div class="flex flex-col gap-3">
+          <label for="scale" class="text-sm font-medium tracking-wide text-neutral-600">
+            Gammes / Intervalles / Accords
+          </label>
+          <select
+            id="scale"
+            v-model="scaleKey"
+            class="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
+          >
+            <option value="">Aucun</option>
+            <optgroup v-for="g in SCALE_TYPES" :key="g.type" :label="g.label">
+              <option v-for="s in scalesOfType(g.type)" :key="s.key" :value="s.key">
+                {{ s.label }}
+              </option>
+            </optgroup>
+          </select>
+
+          <!-- Listening mode (only relevant when a scale is selected) -->
+          <div v-if="selectedScale" class="flex flex-col gap-2 pt-1">
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="scaleAudioMode"
+                type="radio"
+                value="scale-only"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">N'entendre que les notes de la sélection</span>
+            </label>
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="scaleAudioMode"
+                type="radio"
+                value="all"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Entendre toutes les notes</span>
+            </label>
+          </div>
+
+          <!-- Play the selection (hover to listen) -->
+          <div v-if="selectedScale" class="flex flex-col gap-2 pt-2">
+            <span class="text-sm font-medium tracking-wide text-neutral-600">
+              Écouter la sélection
+            </span>
+            <div class="flex gap-2">
+              <div
+                class="flex flex-1 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 px-1 py-2 text-center text-sm text-neutral-600 transition-colors duration-150 select-none cursor-pointer hover:bg-neutral-200"
+                @mouseenter="playSelectionAscending"
+              >
+                En montant
+              </div>
+              <div
+                class="flex flex-1 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 px-1 py-2 text-center text-sm text-neutral-600 transition-colors duration-150 select-none cursor-pointer hover:bg-neutral-200"
+                @mouseenter="playSelectionDescending"
+              >
+                En descendant
+              </div>
+              <div
+                class="flex flex-1 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 px-1 py-2 text-center text-sm text-neutral-600 transition-colors duration-150 select-none cursor-pointer hover:bg-neutral-200"
+                @mouseenter="playSelectionTogether"
+              >
+                Ensemble
+              </div>
+            </div>
+          </div>
+
+          <!-- Highlight scope (only relevant when a scale is selected) -->
+          <div v-if="selectedScale" class="flex flex-col gap-2 pt-2">
+            <span class="text-sm font-medium tracking-wide text-neutral-600">
+              Mise en évidence
+            </span>
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="scaleHighlightMode"
+                type="radio"
+                value="single"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Une octave</span>
+            </label>
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="scaleHighlightMode"
+                type="radio"
+                value="all"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Toutes les octaves</span>
+            </label>
+
+            <label class="flex cursor-pointer items-center gap-2 pt-1">
+              <input
+                v-model="hideLabelsOutOfScale"
+                type="checkbox"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Masquer les libellés hors sélection</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Play mode -->
+        <div class="flex flex-col gap-3">
+          <span class="text-sm font-medium tracking-wide text-neutral-600">Mode de jeu</span>
+          <div class="flex flex-wrap gap-x-6 gap-y-2">
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="playMode"
+                type="radio"
+                value="short"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Note courte</span>
+            </label>
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="playMode"
+                type="radio"
+                value="sustain"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Note tenue</span>
+            </label>
+          </div>
+        </div>
+        </div>
+
+        <!-- Column 4: keys -->
+        <div class="flex flex-col gap-6">
+        <!-- Key (tonalité) -->
+        <div class="flex flex-col gap-3">
+          <label for="key" class="text-sm font-medium tracking-wide text-neutral-600">
+            Tonalités
+          </label>
+          <select
+            id="key"
+            v-model="keyChoice"
+            class="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
+          >
+            <option value="">—</option>
+            <option v-for="t in KEYS" :key="t.key" :value="t.key">
+              {{ t.signature ? `${t.label} (${t.signature})` : t.label }}
+            </option>
+          </select>
         </div>
         </div>
       </div>

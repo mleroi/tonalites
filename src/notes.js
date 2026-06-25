@@ -111,6 +111,27 @@ export const SCALES = [
   { key: 'c-maj7s5', type: 'chord', label: 'Majeur 7 augmenté (maj7#5)', intervals: [0, 4, 8, 11] },
 ]
 
+// Musical keys from 7 flats to 7 sharps (circle of fifths order). `pitchClass`
+// is the tonic's chromatic index (0 = Do); `accidentals` is the spelling that
+// keeps the key coherent.
+export const KEYS = [
+  { key: 'cb', label: 'Do bémol', pitchClass: 11, accidentals: 'flats', signature: '7 ♭' },
+  { key: 'gb', label: 'Sol bémol', pitchClass: 6, accidentals: 'flats', signature: '6 ♭' },
+  { key: 'db', label: 'Ré bémol', pitchClass: 1, accidentals: 'flats', signature: '5 ♭' },
+  { key: 'ab', label: 'La bémol', pitchClass: 8, accidentals: 'flats', signature: '4 ♭' },
+  { key: 'eb', label: 'Mi bémol', pitchClass: 3, accidentals: 'flats', signature: '3 ♭' },
+  { key: 'bb', label: 'Si bémol', pitchClass: 10, accidentals: 'flats', signature: '2 ♭' },
+  { key: 'f', label: 'Fa', pitchClass: 5, accidentals: 'flats', signature: '1 ♭' },
+  { key: 'c', label: 'Do', pitchClass: 0, accidentals: 'sharps', signature: '' },
+  { key: 'g', label: 'Sol', pitchClass: 7, accidentals: 'sharps', signature: '1 ♯' },
+  { key: 'd', label: 'Ré', pitchClass: 2, accidentals: 'sharps', signature: '2 ♯' },
+  { key: 'a', label: 'La', pitchClass: 9, accidentals: 'sharps', signature: '3 ♯' },
+  { key: 'e', label: 'Mi', pitchClass: 4, accidentals: 'sharps', signature: '4 ♯' },
+  { key: 'b', label: 'Si', pitchClass: 11, accidentals: 'sharps', signature: '5 ♯' },
+  { key: 'fs', label: 'Fa dièse', pitchClass: 6, accidentals: 'sharps', signature: '6 ♯' },
+  { key: 'cs', label: 'Do dièse', pitchClass: 1, accidentals: 'sharps', signature: '7 ♯' },
+]
+
 // Labels for the dropdown option groups, in display order.
 export const SCALE_TYPES = [
   { type: 'scale', label: 'Gammes' },
