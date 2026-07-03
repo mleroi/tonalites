@@ -392,7 +392,7 @@ function dismissOverlay() {
         <div
           v-if="showGlide"
           ref="glideTrack"
-          class="relative h-10 w-full cursor-ew-resize touch-none select-none overflow-hidden rounded-md border border-neutral-200 bg-gradient-to-r from-neutral-50 to-neutral-200"
+          class="relative h-40 w-full cursor-ew-resize touch-none select-none overflow-hidden rounded-md border border-neutral-200 bg-gradient-to-r from-neutral-50 to-neutral-200"
           @pointerenter="onGlideEnter"
           @pointermove="onGlideMove"
           @pointerleave="onGlideLeave"
