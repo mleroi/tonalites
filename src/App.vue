@@ -10,6 +10,8 @@ import {
   SCALES,
   SCALE_TYPES,
   KEYS,
+  TESSITURAS,
+  TESSITURA_TYPES,
   MIN_NOTE,
   MAX_NOTE,
   MIN_NUMBER_START,
@@ -139,6 +141,23 @@ const selectedScale = computed(() => SCALES.find((s) => s.key === scaleKey.value
 // Note sets of a given type, for the grouped dropdown.
 function scalesOfType(type) {
   return SCALES.filter((s) => s.type === type)
+}
+
+// Selected tessitura ('' = none); its notes get a pastel-yellow background.
+const tessituraChoice = ref('')
+const selectedTessitura = computed(
+  () => TESSITURAS.find((t) => t.key === tessituraChoice.value) || null,
+)
+
+// Tessituras of a given type, for the grouped dropdown.
+function tessiturasOfType(type) {
+  return TESSITURAS.filter((t) => t.type === type)
+}
+
+// True if the note falls within the selected tessitura's range.
+function inTessitura(semitone) {
+  const t = selectedTessitura.value
+  return t ? semitone >= t.low && semitone <= t.high : false
 }
 
 // The selection's notes, one octave from the tonic ("note du 1").
@@ -427,6 +446,7 @@ function dismissOverlay() {
             :black="isBlackKey(firstNote + i)"
             :highlighted="isHighlighted(firstNote + i)"
             :highlight-one="highlightOnes && isOneNote(firstNote + i)"
+            :in-tessitura="inTessitura(firstNote + i)"
             :playing="playingNotes.has(firstNote + i)"
             @press="pressNote(firstNote + i)"
             @enter="enterNote(firstNote + i)"
@@ -852,6 +872,25 @@ function dismissOverlay() {
             <option v-for="t in KEYS" :key="t.key" :value="t.key">
               {{ t.signature ? `${t.label} (${t.signature})` : t.label }}
             </option>
+          </select>
+        </div>
+
+        <!-- Tessitura (instrument / voice range) -->
+        <div class="flex flex-col gap-3">
+          <label for="tessitura" class="text-sm font-medium tracking-wide text-neutral-600">
+            Tessitures
+          </label>
+          <select
+            id="tessitura"
+            v-model="tessituraChoice"
+            class="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
+          >
+            <option value="">—</option>
+            <optgroup v-for="g in TESSITURA_TYPES" :key="g.type" :label="g.label">
+              <option v-for="t in tessiturasOfType(g.type)" :key="t.key" :value="t.key">
+                {{ t.label }}
+              </option>
+            </optgroup>
           </select>
         </div>
         </div>

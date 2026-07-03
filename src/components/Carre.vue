@@ -59,6 +59,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Whether this note is within the selected tessitura (pastel-yellow bg).
+  inTessitura: {
+    type: Boolean,
+    default: false,
+  },
   // Whether this note is currently being played (transient highlight).
   playing: {
     type: Boolean,
@@ -76,6 +81,9 @@ const backgroundClasses = computed(() => {
     return props.black
       ? 'bg-neutral-900 hover:bg-neutral-800 active:bg-neutral-700'
       : 'bg-white hover:bg-neutral-100 active:bg-neutral-200'
+  }
+  if (props.inTessitura) {
+    return 'bg-yellow-100 hover:bg-yellow-200 active:bg-yellow-300'
   }
   return 'bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300'
 })

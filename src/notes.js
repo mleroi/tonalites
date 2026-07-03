@@ -139,6 +139,25 @@ export const SCALE_TYPES = [
   { type: 'chord', label: 'Accords' },
 ]
 
+// Instrument and voice ranges (tessituras), as inclusive absolute semitone
+// bounds (0 = Do1 = C1 = MIDI 24).
+export const TESSITURAS = [
+  { key: 'piano', type: 'instrument', label: 'Piano', low: -3, high: 84 }, // A0–C8
+  { key: 'guitar', type: 'instrument', label: 'Guitare', low: 16, high: 64 }, // E2–E6
+  { key: 'bass', type: 'instrument', label: 'Basse', low: 4, high: 43 }, // E1–G4
+  { key: 'violin', type: 'instrument', label: 'Violon', low: 31, high: 76 }, // G3–E7
+  { key: 'soprano', type: 'voice', label: 'Soprano', low: 36, high: 60 }, // Do4–Do6
+  { key: 'alto', type: 'voice', label: 'Alto', low: 29, high: 53 }, // Fa3–Fa5
+  { key: 'tenor', type: 'voice', label: 'Ténor', low: 24, high: 48 }, // Do3–Do5
+  { key: 'basse-voix', type: 'voice', label: 'Basse', low: 16, high: 40 }, // Mi2–Mi4
+]
+
+// Labels for the tessitura dropdown option groups, in display order.
+export const TESSITURA_TYPES = [
+  { type: 'instrument', label: 'Instruments' },
+  { type: 'voice', label: 'Voix' },
+]
+
 // True if `semitone` belongs to the scale built on `tonic` with the given
 // intervals (compared modulo the octave).
 export function isInScale(semitone, tonic, intervals) {
