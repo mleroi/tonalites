@@ -1,0 +1,26 @@
+Acoustic guitar samples
+=======================
+
+Origin
+    Recorded by the University of Iowa Electronic Music Studios.
+    http://theremin.music.uiowa.edu/
+
+Obtained from
+    nbrosowsky/tonejs-instruments, folder samples/guitar-acoustic
+    https://github.com/nbrosowsky/tonejs-instruments
+    (project code MIT, samples released under CC-BY 3.0)
+
+Licence
+    Creative Commons Attribution 3.0
+    https://creativecommons.org/licenses/by/3.0/
+
+What is shipped here
+    The upstream set is sampled chromatically over D2-D5 (37 files, 6.97 MB).
+    Only 13 of those files are included here, one every three semitones:
+
+        D2 F2 G#2 B2 D3 F3 G#3 B3 D4 F4 G#4 B4 D5
+
+    Tone.Sampler repitches them to cover the notes in between, which keeps the
+    shift under two semitones — the same fidelity criterion used for the piano
+    samples, at a comparable download size. The files themselves are byte-for-
+    byte identical to the originals; only the selection is reduced.

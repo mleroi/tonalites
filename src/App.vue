@@ -17,11 +17,13 @@ import {
   MIN_NUMBER_START,
   MAX_NUMBER_START,
 } from './notes.js'
+import { INSTRUMENTS } from './instruments.js'
 import {
   playNote,
   startNote,
   stopNote,
   releaseAllNotes,
+  setInstrument,
   startAudio,
   startDrone,
   stopDrone,
@@ -269,6 +271,22 @@ function squareLabel(semitone) {
   const degree = (((relative % 12) + 12) % 12)
   return labelMode.value === 'intervals' ? INTERVALS[degree] : String(degree + 1)
 }
+
+// Sound of the squares: '' = the built-in synth, otherwise an instrument key
+// from the registry. A sampled instrument downloads its samples on selection,
+// during which the synth keeps playing.
+const instrumentKey = ref('')
+const instrumentLoading = ref(false)
+
+// Identifies the latest selection, so that a slow load which is no longer the
+// current choice does not clear the indicator of the one that replaced it.
+let instrumentRequest = 0
+watch(instrumentKey, async (key) => {
+  const request = ++instrumentRequest
+  instrumentLoading.value = key !== ''
+  await setInstrument(key)
+  if (request === instrumentRequest) instrumentLoading.value = false
+})
 
 // Play mode: 'short' = a brief note on hover (default), 'sustain' = the note
 // rings as long as the pointer stays inside the square.
@@ -856,8 +874,26 @@ function dismissOverlay() {
         </div>
         </div>
 
-        <!-- Column 4: keys -->
+        <!-- Column 4: sound, keys, tessituras -->
         <div class="flex flex-col gap-6">
+        <!-- Sound: the built-in synth or a sampled instrument -->
+        <div class="flex flex-col gap-3">
+          <div class="flex items-baseline justify-between">
+            <label for="instrument" class="text-sm font-medium tracking-wide text-neutral-600">
+              Sonorité
+            </label>
+            <span v-if="instrumentLoading" class="text-sm text-neutral-400">chargement…</span>
+          </div>
+          <select
+            id="instrument"
+            v-model="instrumentKey"
+            class="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
+          >
+            <option value="">Synthétiseur</option>
+            <option v-for="i in INSTRUMENTS" :key="i.key" :value="i.key">{{ i.label }}</option>
+          </select>
+        </div>
+
         <!-- Key (tonalité) -->
         <div class="flex flex-col gap-3">
           <label for="key" class="text-sm font-medium tracking-wide text-neutral-600">

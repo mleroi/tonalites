@@ -48,6 +48,10 @@ that, several layers help you read what you hear:
 - **Accidentals** displayed as sharps or flats, applied everywhere.
 - **Playback modes**: short note on hover, or sustained while the pointer stays
   on the square.
+- **Sound ("Sonorité")**: the built-in synth, or a sampled instrument — an
+  acoustic piano or an acoustic guitar. Samples are only downloaded when the
+  instrument is selected, and the synth keeps playing meanwhile, so the app is
+  never silent or blocked.
 - **Drone** with its own note and volume.
 - **Glissando band** for continuous pitch, showing the live frequency and the
   note name when it lands on an exact pitch.
@@ -104,11 +108,48 @@ src/
   App.vue              Main view: controls and the row of squares
   components/
     Carre.vue          A single note square (label, colors, events)
-  audio.js             Tone.js setup: notes, drone, glissando
+  audio.js             Tone.js setup: notes, drone, glissando, samplers
   notes.js             Note names, intervals, scales, helpers
+  instruments.js       Registry of sampled instruments (samples, levels)
   main.js              App entry point
   style.css            Tailwind entry
+public/
+  samples/piano/       The 30 piano samples, served as static files
+  samples/guitar/      The 13 guitar samples, likewise
 ```
+
+### Adding a sampled instrument
+
+`audio.js` is instrument-agnostic: it builds a `Tone.Sampler` from whatever a
+registry entry describes. Adding an instrument means dropping its samples in
+`public/samples/<name>/` and adding one entry to `INSTRUMENTS` in
+[`src/instruments.js`](src/instruments.js) — no change to the audio code.
+
+Two things are worth knowing before adding one. Percussive instruments (piano,
+guitar) suit the hover interaction naturally, whereas sustained ones (brass,
+strings) need a much longer `noteLength` or a brief hover only produces a blip.
+And the glissando band and the drone deliberately keep their own oscillators: a
+sampler cannot sweep pitch continuously, and a piano cannot hold a drone.
+
+## Credits
+
+Both sample sets are distributed under the
+[Creative Commons Attribution 3.0](https://creativecommons.org/licenses/by/3.0/)
+licence, which requires that their authors be credited wherever the app is
+published. Each folder under `public/samples/` also carries a `README` stating
+its own origin, licence and what was selected from it.
+
+- **Piano** — *Salamander Grand Piano* (Yamaha C5) by **Alexander Holm**. The
+  30-sample subset published for Tone.js, one sample every minor third from A0
+  to C8, copied unmodified into
+  [`public/samples/piano/`](public/samples/piano/) alongside the author's
+  original `README`.
+- **Guitar** — recorded by the **University of Iowa Electronic Music Studios**,
+  obtained via [nbrosowsky/tonejs-instruments](https://github.com/nbrosowsky/tonejs-instruments)
+  (project code MIT, samples CC-BY 3.0). The upstream set is chromatic over
+  D2–D5; [`public/samples/guitar/`](public/samples/guitar/) keeps 13 of those
+  files, one every three semitones, to match the piano's fidelity at a
+  comparable size. The files are unmodified — only the selection is reduced.
 
 ## Browser audio note
 
