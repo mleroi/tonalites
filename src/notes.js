@@ -76,6 +76,11 @@ export const SCALES = [
   { key: 'min-melodic', type: 'scale', label: 'Gamme mineure mélodique', intervals: [0, 2, 3, 5, 7, 9, 11, 12] },
   { key: 'locrian', type: 'scale', label: 'Mode Locrien', intervals: [0, 1, 3, 5, 6, 8, 10, 12] },
 
+  // Five-note scales. Their labels stay explicit because a collapsed <select>
+  // shows the option alone, without its group heading.
+  { key: 'penta-maj', type: 'pentatonic', label: 'Pentatonique majeure', intervals: [0, 2, 4, 7, 9, 12] },
+  { key: 'penta-min', type: 'pentatonic', label: 'Pentatonique mineure', intervals: [0, 3, 5, 7, 10, 12] },
+
   // Every interval from the tonic, within one octave.
   { key: 'i-min2', type: 'interval', label: 'Seconde mineure (b2)', intervals: [0, 1] },
   { key: 'i-maj2', type: 'interval', label: 'Seconde majeure (M2)', intervals: [0, 2] },
@@ -135,6 +140,7 @@ export const KEYS = [
 // Labels for the dropdown option groups, in display order.
 export const SCALE_TYPES = [
   { type: 'scale', label: 'Gammes' },
+  { type: 'pentatonic', label: 'Gammes pentatoniques' },
   { type: 'interval', label: 'Intervalles' },
   { type: 'chord', label: 'Accords' },
 ]
@@ -163,4 +169,87 @@ export const TESSITURA_TYPES = [
 export function isInScale(semitone, tonic, intervals) {
   const degree = (((semitone - tonic) % 12) + 12) % 12
   return intervals.includes(degree)
+}
+
+// Scale degrees as Roman numerals, indexed by rank within the scale (0 = the
+// tonic). These are plain numbers: no chord quality (major, minor, diminished)
+// is implied by the casing or by any suffix.
+export const ROMAN_DEGREES = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII']
+
+// Rank of `semitone` within the scale built on `tonic`, as a Roman numeral,
+// or null when the note does not belong to the scale. The scale's trailing
+// octave interval (12) is never matched, since the comparison is modulo the
+// octave, so the tonic always reads "I".
+//
+// Rank and degree only coincide for the seven-note scales, which is why the
+// caller restricts this to `type: 'scale'`. A pentatonic's degrees are named
+// after the diatonic positions it keeps, so it would need its own mapping.
+export function scaleDegree(semitone, tonic, intervals) {
+  const rank = scaleRank(semitone, tonic, intervals)
+  return rank >= 0 && rank < ROMAN_DEGREES.length ? ROMAN_DEGREES[rank] : null
+}
+
+// Rank of `semitone` within the scale built on `tonic`, counting from 0 for
+// the tonic, or -1 when the note does not belong to the scale.
+export function scaleRank(semitone, tonic, intervals) {
+  const degree = (((semitone - tonic) % 12) + 12) % 12
+  return intervals.indexOf(degree)
+}
+
+// Chord sizes offered by the chord-listening mode, in notes.
+export const CHORD_SIZES = [3, 4, 5]
+
+// Notes of the chord built on the scale's `rank` degree, as semitone intervals
+// from the chord's own root (so the first is always 0). The chord is built the
+// diatonic way, by stacking every other scale note — ranks r, r+2, r+4… — so
+// it only ever contains notes of the scale. `count` is how many notes to take.
+export function diatonicChordIntervals(intervals, rank, count) {
+  const degrees = intervals.filter((d) => d < 12)
+  const size = degrees.length
+  // A rank past the last degree wraps around into the octave above.
+  const at = (k) => degrees[((k % size) + size) % size] + 12 * Math.floor(k / size)
+  const root = at(rank)
+  return Array.from({ length: count }, (_, i) => at(rank + 2 * i) - root)
+}
+
+// Full-word names for every chord the construction above can produce, keyed by
+// the chord's semitone intervals from its root. Stacking thirds over the nine
+// seven-note scales yields exactly these 22 shapes — 4 of three notes, 7 of
+// four and 11 of five — so the table is exhaustive rather than a best effort.
+//
+// The names state the chord's nature only, with no root note, and agree with
+// "accord" (masculine), like the chord entries in SCALES.
+export const CHORD_NAMES = {
+  // Three notes
+  '0,3,6': 'Diminué',
+  '0,3,7': 'Mineur',
+  '0,4,7': 'Majeur',
+  '0,4,8': 'Augmenté',
+
+  // Four notes
+  '0,3,6,9': 'Diminué septième',
+  '0,3,6,10': 'Demi-diminué',
+  '0,3,7,10': 'Mineur septième',
+  '0,3,7,11': 'Mineur majeur septième',
+  '0,4,7,10': 'Dominante septième',
+  '0,4,7,11': 'Majeur septième',
+  '0,4,8,11': 'Majeur septième quinte augmentée',
+
+  // Five notes
+  '0,3,6,9,13': 'Diminué septième neuvième bémol',
+  '0,3,6,10,13': 'Demi-diminué neuvième bémol',
+  '0,3,6,10,14': 'Demi-diminué neuvième',
+  '0,3,7,10,13': 'Mineur septième neuvième bémol',
+  '0,3,7,10,14': 'Mineur neuvième',
+  '0,3,7,11,14': 'Mineur majeur neuvième',
+  '0,4,7,10,13': 'Dominante septième neuvième bémol',
+  '0,4,7,10,14': 'Dominante neuvième',
+  '0,4,7,11,14': 'Majeur neuvième',
+  '0,4,7,11,15': 'Majeur septième neuvième augmentée',
+  '0,4,8,11,14': 'Majeur neuvième quinte augmentée',
+}
+
+// Name of a chord from its intervals, or null when the shape is not listed.
+export function chordName(chordIntervals) {
+  return CHORD_NAMES[chordIntervals.join(',')] || null
 }

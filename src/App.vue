@@ -6,6 +6,11 @@ import {
   pitchClassName,
   isBlackKey,
   isInScale,
+  scaleDegree,
+  scaleRank,
+  diatonicChordIntervals,
+  chordName,
+  CHORD_SIZES,
   INTERVALS,
   SCALES,
   SCALE_TYPES,
@@ -139,6 +144,26 @@ const hideLabelsOutOfScale = ref(true)
 
 // The currently selected scale object, or null when none is selected.
 const selectedScale = computed(() => SCALES.find((s) => s.key === scaleKey.value) || null)
+
+// Whether to write each scale note's degree in Roman numerals below its square.
+const showDegrees = ref(false)
+
+// True when the selection is one of the seven-note scales. Both the degrees
+// and the chord-listening mode depend on this: intervals and chords are not
+// numbered in degrees, and a pentatonic's degrees are named after the diatonic
+// positions it keeps (I II III V VI) rather than its own five ranks, so
+// stacking or numbering them here would be wrong.
+const sevenNoteScale = computed(
+  () => selectedScale.value !== null && selectedScale.value.type === 'scale',
+)
+
+// Roman numeral shown below a square, or null when degrees are hidden, no
+// scale is selected, or the note falls outside it. Unlike the highlight, this
+// is not limited to a single octave: a degree holds wherever the note appears.
+function squareDegree(semitone) {
+  if (!showDegrees.value || !sevenNoteScale.value) return null
+  return scaleDegree(semitone, numberStart.value, selectedScale.value.intervals)
+}
 
 // Note sets of a given type, for the grouped dropdown.
 function scalesOfType(type) {
@@ -288,6 +313,32 @@ watch(instrumentKey, async (key) => {
   if (request === instrumentRequest) instrumentLoading.value = false
 })
 
+// Number of notes in the chords played by the chord-listening mode.
+const chordSize = ref(3)
+
+// True when hovering a square should play a chord rather than a single note.
+// Guarded by the scale type, so a selection left on 'chords' while switching
+// to a pentatonic or a chord falls back to playing single notes.
+const chordMode = computed(() => scaleAudioMode.value === 'chords' && sevenNoteScale.value)
+
+// Name of the chord currently under the pointer, shown below the squares.
+const hoveredChord = ref('')
+
+// Notes of a chord being held in sustain mode, so that exactly those can be
+// released on leaving — recomputing them could differ if a setting changed in
+// the meantime, which would leave a note ringing.
+let sustainedChord = []
+
+// The chord rooted on `semitone`, or null when that note is not in the scale
+// (chords are only built on scale notes).
+function chordOn(semitone) {
+  const scale = selectedScale.value
+  const rank = scaleRank(semitone, numberStart.value, scale.intervals)
+  if (rank < 0) return null
+  const intervals = diatonicChordIntervals(scale.intervals, rank, chordSize.value)
+  return { notes: intervals.map((d) => semitone + d), name: chordName(intervals) }
+}
+
 // Play mode: 'short' = a brief note on hover (default), 'sustain' = the note
 // rings as long as the pointer stays inside the square.
 const playMode = ref('short')
@@ -298,12 +349,42 @@ watch(playMode, (mode) => {
   if (mode !== 'sustain') {
     releaseAllNotes()
     playingNotes.value.clear()
+    sustainedChord = []
   }
+})
+
+// Changing the chord size or the listening mode while a chord is held would
+// leave it with no matching release, so silence whatever is ringing.
+watch([chordSize, scaleAudioMode], () => {
+  releaseAllNotes()
+  playingNotes.value.clear()
+  sustainedChord = []
+  hoveredChord.value = ''
 })
 
 // Pointer enters a square: play it (if audible) according to the play mode,
 // and highlight it (briefly in short mode, until leaving in sustain mode).
+// In chord mode the whole chord is played and highlighted instead.
 function enterNote(semitone) {
+  if (chordMode.value) {
+    const chord = chordOn(semitone)
+    if (!chord) {
+      // Not a scale note: nothing to play, and no name to show.
+      hoveredChord.value = ''
+      return
+    }
+    hoveredChord.value = chord.name || ''
+    if (playMode.value === 'sustain') {
+      chord.notes.forEach((n) => {
+        startNote(n)
+        playingNotes.value.add(n)
+      })
+      sustainedChord = chord.notes
+    } else {
+      chord.notes.forEach((n) => playAndFlash(n, 400))
+    }
+    return
+  }
   if (!isAudible(semitone)) return
   if (playMode.value === 'sustain') {
     startNote(semitone)
@@ -313,17 +394,34 @@ function enterNote(semitone) {
   }
 }
 
-// Pointer leaves a square: stop and unhighlight its sustained note.
+// Pointer leaves a square: stop and unhighlight its sustained note, or the
+// whole chord it was holding.
 function leaveNote(semitone) {
+  if (chordMode.value) {
+    hoveredChord.value = ''
+    sustainedChord.forEach((n) => {
+      stopNote(n)
+      playingNotes.value.delete(n)
+    })
+    sustainedChord = []
+    return
+  }
   if (playMode.value === 'sustain') {
     stopNote(semitone)
     playingNotes.value.delete(semitone)
   }
 }
 
-// Mouse pressed on a square: re-strike and re-flash it in short mode.
+// Mouse pressed on a square: re-strike and re-flash it in short mode — the
+// whole chord when in chord mode.
 function pressNote(semitone) {
-  if (playMode.value === 'short' && isAudible(semitone)) {
+  if (playMode.value !== 'short') return
+  if (chordMode.value) {
+    const chord = chordOn(semitone)
+    if (chord) chord.notes.forEach((n) => playAndFlash(n, 400))
+    return
+  }
+  if (isAudible(semitone)) {
     playAndFlash(semitone, 250)
   }
 }
@@ -460,6 +558,7 @@ function dismissOverlay() {
             :show-note="showNotes"
             :frequency="`${Math.round(semitoneToFrequency(firstNote + i))} Hz`"
             :show-frequency="showFrequencies"
+            :degree="squareDegree(firstNote + i)"
             :piano-mode="pianoMode"
             :black="isBlackKey(firstNote + i)"
             :highlighted="isHighlighted(firstNote + i)"
@@ -470,6 +569,15 @@ function dismissOverlay() {
             @enter="enterNote(firstNote + i)"
             @leave="leaveNote(firstNote + i)"
           />
+        </div>
+
+        <!-- Nature of the chord under the pointer, in the chord mode. The row
+             keeps its height whether or not a chord sounds, so the squares
+             above never shift while sweeping across them. -->
+        <div v-if="chordMode" class="flex h-7 items-center justify-center">
+          <span class="select-none text-base tracking-wide text-neutral-600">
+            {{ hoveredChord }}
+          </span>
         </div>
       </div>
     </main>
@@ -784,6 +892,35 @@ function dismissOverlay() {
               />
               <span class="text-sm text-neutral-600">Entendre toutes les notes</span>
             </label>
+
+            <!-- Chords are built by stacking scale notes, which only makes
+                 sense for a seven-note scale -->
+            <label v-if="sevenNoteScale" class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="scaleAudioMode"
+                type="radio"
+                value="chords"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Entendre les accords</span>
+            </label>
+
+            <!-- How many notes each chord has -->
+            <div v-if="chordMode" class="flex flex-wrap gap-x-6 gap-y-2 pl-6">
+              <label
+                v-for="size in CHORD_SIZES"
+                :key="size"
+                class="flex cursor-pointer items-center gap-2"
+              >
+                <input
+                  v-model.number="chordSize"
+                  type="radio"
+                  :value="size"
+                  class="size-4 accent-neutral-800"
+                />
+                <span class="text-sm text-neutral-600">Accords {{ size }} sons</span>
+              </label>
+            </div>
           </div>
 
           <!-- Play the selection (hover to listen) -->
@@ -844,6 +981,16 @@ function dismissOverlay() {
                 class="size-4 accent-neutral-800"
               />
               <span class="text-sm text-neutral-600">Masquer les libellés hors sélection</span>
+            </label>
+
+            <!-- Degrees only apply to a scale, not to an interval or a chord -->
+            <label v-if="sevenNoteScale" class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="showDegrees"
+                type="checkbox"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Afficher les degrés</span>
             </label>
           </div>
         </div>

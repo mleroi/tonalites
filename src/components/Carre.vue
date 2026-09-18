@@ -39,6 +39,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Scale degree in Roman numerals, displayed below the note name and the
+  // frequency, or null to display nothing. Unlike the two above, this has no
+  // matching "show" flag: a degree is absent for any note outside the scale,
+  // so the caller passes null in both cases.
+  degree: {
+    type: String,
+    default: null,
+  },
   // When true, color the square like a piano key.
   pianoMode: {
     type: Boolean,
@@ -133,9 +141,13 @@ const playingClasses = computed(() => (props.playing ? 'z-10 scale-110' : ''))
       </span>
     </div>
 
-    <!-- Note name and frequency below the square; each is hidden only once the
-         square gets too small for that particular text. -->
-    <div v-if="showNote || showFrequency" class="flex flex-col items-center gap-0.5">
+    <!-- Note name, frequency and degree below the square, in that order; each
+         is hidden only once the square gets too small for that particular
+         text. -->
+    <div
+      v-if="showNote || showFrequency || degree !== null"
+      class="flex flex-col items-center gap-0.5"
+    >
       <span
         v-if="showNote"
         class="hidden select-none whitespace-nowrap text-[clamp(9px,16cqw,13px)] leading-none text-neutral-500 @min-[28px]:block"
@@ -147,6 +159,13 @@ const playingClasses = computed(() => (props.playing ? 'z-10 scale-110' : ''))
         class="hidden select-none whitespace-nowrap text-[clamp(8px,13cqw,11px)] leading-none text-neutral-400 @min-[40px]:block"
       >
         {{ frequency }}
+      </span>
+      <!-- Same type as the note name, so the two read as one stack. -->
+      <span
+        v-if="degree !== null"
+        class="hidden select-none whitespace-nowrap text-[clamp(9px,16cqw,13px)] leading-none text-neutral-500 @min-[28px]:block"
+      >
+        {{ degree }}
       </span>
     </div>
   </div>
