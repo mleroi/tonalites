@@ -96,6 +96,26 @@ const labelScope = ref('single')
 const accidentals = ref('sharps')
 const useFlats = computed(() => accidentals.value === 'flats')
 
+// Three intervals have two equally correct names, and which one applies
+// depends on the chord being read: a diminished fifth in a diminished chord
+// but an augmented fourth elsewhere, an augmented fifth in an augmented
+// chord, a diminished seventh in a diminished seventh chord. The app makes no
+// attempt to infer it — the spelling is picked by hand and applies wherever
+// intervals are written, in the squares as on the chord geometry strip.
+const INTERVAL_CHOICES = [
+  { degree: 6, names: ['#4', 'b5'] },
+  { degree: 8, names: ['b6', '#5'] },
+  { degree: 9, names: ['M6', '7°'] },
+]
+const intervalNames = ref(
+  Object.fromEntries(INTERVAL_CHOICES.map(({ degree, names }) => [degree, names[0]])),
+)
+
+// Name of the interval `degree` semitones above the reference note.
+function intervalName(degree) {
+  return intervalNames.value[degree] ?? INTERVALS[degree]
+}
+
 // Selected key ('' = none). Choosing one moves the "note du 1" to its tonic in
 // octave 4 (Do4 = semitone 36) and adapts the accidentals spelling.
 const keyChoice = ref('')
@@ -157,12 +177,25 @@ const sevenNoteScale = computed(
   () => selectedScale.value !== null && selectedScale.value.type === 'scale',
 )
 
-// Roman numeral shown below a square, or null when degrees are hidden, no
-// scale is selected, or the note falls outside it. Unlike the highlight, this
-// is not limited to a single octave: a degree holds wherever the note appears.
-function squareDegree(semitone) {
-  if (!showDegrees.value || !sevenNoteScale.value) return null
+// The degree labels only exist for a seven-note scale, so leaving one behind
+// would blank out every square: fall back to the numbering instead.
+watch(sevenNoteScale, (ok) => {
+  if (!ok && labelMode.value === 'degrees') labelMode.value = 'numbers'
+})
+
+// Roman numeral of a note within the selected scale, or null when no
+// seven-note scale is selected or the note falls outside it. Unlike the
+// highlight, this is not limited to a single octave: a degree holds wherever
+// the note appears. Shared by the degree line below the squares and by the
+// 'degrees' label mode, so both read the same numeral.
+function romanDegree(semitone) {
+  if (!sevenNoteScale.value) return null
   return scaleDegree(semitone, numberStart.value, selectedScale.value.intervals)
+}
+
+// Roman numeral shown below a square, or null when degrees are hidden.
+function squareDegree(semitone) {
+  return showDegrees.value ? romanDegree(semitone) : null
 }
 
 // Note sets of a given type, for the grouped dropdown.
@@ -265,6 +298,18 @@ function isAudible(semitone) {
 // 12 squares per octave.
 const carres = computed(() => Array.from({ length: octaves.value * 12 }, (_, i) => i))
 
+// Gap between squares in pixels (Tailwind gap-1.5 = 0.375rem = 6px). Anything
+// that has to line up with the squares — the glissando band, the chord
+// geometry strip — measures them from this.
+const SQUARE_GAP = 6
+
+// Width of one square as a CSS expression, given a row that fills the whole
+// area: the squares share it evenly, minus the gaps between them.
+const squareWidthCss = computed(() => {
+  const count = carres.value.length
+  return `((100% - ${(count - 1) * SQUARE_GAP}px) / ${count})`
+})
+
 // Name of the currently selected starting note (shown next to the slider).
 const firstNoteName = computed(() => noteName(firstNote.value, useFlats.value))
 
@@ -293,8 +338,11 @@ function squareLabel(semitone) {
   if (labelMode.value === 'names') {
     return pitchClassName(semitone, useFlats.value)
   }
+  if (labelMode.value === 'degrees') {
+    return romanDegree(semitone)
+  }
   const degree = (((relative % 12) + 12) % 12)
-  return labelMode.value === 'intervals' ? INTERVALS[degree] : String(degree + 1)
+  return labelMode.value === 'intervals' ? intervalName(degree) : String(degree + 1)
 }
 
 // Sound of the squares: '' = the built-in synth, otherwise an instrument key
@@ -323,6 +371,46 @@ const chordMode = computed(() => scaleAudioMode.value === 'chords' && sevenNoteS
 
 // Name of the chord currently under the pointer, shown below the squares.
 const hoveredChord = ref('')
+
+// Notes of that same chord, kept highlighted for as long as the pointer stays
+// in the square, and reported on the geometry strip. Separate from
+// `playingNotes`, whose highlight follows the sound and so fades after a
+// moment in the short play mode. The first note is the chord's root.
+const hoveredChordNotes = ref([])
+
+// The chord geometry strip: a fixed row of squares, always starting on the
+// chord's root, where the chord under the pointer is reported so that its
+// shape — and only its shape — changes from one chord to the next. Twelve
+// squares, because a four-note chord reaches at most a major seventh over its
+// root, eleven semitones away. Five-note chords go further and are left out.
+const CHORD_STRIP_LENGTH = 12
+const chordStripCells = Array.from({ length: CHORD_STRIP_LENGTH }, (_, i) => i)
+const showChordStrip = computed(() => chordMode.value && chordSize.value <= 4)
+
+// The strip is exactly as wide as twelve squares of the main row, so its
+// squares are the same size and their labels stay readable. The block is then
+// centered, which keeps its left edge fixed since its width only depends on
+// the square size.
+const chordStripStyle = computed(() => ({
+  width: `calc(${CHORD_STRIP_LENGTH} * ${squareWidthCss.value} + ${
+    (CHORD_STRIP_LENGTH - 1) * SQUARE_GAP
+  }px)`,
+}))
+
+// Whether the hovered chord occupies the square `offset` semitones above its
+// root.
+function chordStripFilled(offset) {
+  const notes = hoveredChordNotes.value
+  return notes.length > 0 && notes.includes(notes[0] + offset)
+}
+
+// Label of an occupied square, always the interval from the chord's root
+// (which is the first square) whatever the label mode chosen for the main
+// row: the strip describes how the chord is built, not which notes it lands
+// on. Empty squares stay blank.
+function chordStripLabel(offset) {
+  return chordStripFilled(offset) ? intervalName(offset) : null
+}
 
 // Notes of a chord being held in sustain mode, so that exactly those can be
 // released on leaving — recomputing them could differ if a setting changed in
@@ -355,11 +443,12 @@ watch(playMode, (mode) => {
 
 // Changing the chord size or the listening mode while a chord is held would
 // leave it with no matching release, so silence whatever is ringing.
-watch([chordSize, scaleAudioMode], () => {
+watch([chordSize, scaleAudioMode, chordMode], () => {
   releaseAllNotes()
   playingNotes.value.clear()
   sustainedChord = []
   hoveredChord.value = ''
+  hoveredChordNotes.value = []
 })
 
 // Pointer enters a square: play it (if audible) according to the play mode,
@@ -369,11 +458,14 @@ function enterNote(semitone) {
   if (chordMode.value) {
     const chord = chordOn(semitone)
     if (!chord) {
-      // Not a scale note: nothing to play, and no name to show.
+      // Not a scale note: nothing to play, no name to show and nothing to
+      // highlight.
       hoveredChord.value = ''
+      hoveredChordNotes.value = []
       return
     }
     hoveredChord.value = chord.name || ''
+    hoveredChordNotes.value = chord.notes
     if (playMode.value === 'sustain') {
       chord.notes.forEach((n) => {
         startNote(n)
@@ -399,6 +491,7 @@ function enterNote(semitone) {
 function leaveNote(semitone) {
   if (chordMode.value) {
     hoveredChord.value = ''
+    hoveredChordNotes.value = []
     sustainedChord.forEach((n) => {
       stopNote(n)
       playingNotes.value.delete(n)
@@ -439,10 +532,6 @@ const glideFraction = ref(0)
 const glideHz = ref(0)
 // Note name shown only when the glissando lands (almost) exactly on a note.
 const glideNoteName = ref('')
-
-// Gap between squares in pixels (Tailwind gap-1.5 = 0.375rem = 6px), so the
-// band's note centers line up exactly with the square centers.
-const SQUARE_GAP = 6
 
 // Continuous semitone at a given clientX over the band: the center of square i
 // maps exactly to firstNote + i; in between, the value interpolates linearly.
@@ -565,19 +654,43 @@ function dismissOverlay() {
             :highlight-one="highlightOnes && isOneNote(firstNote + i)"
             :in-tessitura="inTessitura(firstNote + i)"
             :playing="playingNotes.has(firstNote + i)"
+            :in-chord="hoveredChordNotes.includes(firstNote + i)"
             @press="pressNote(firstNote + i)"
             @enter="enterNote(firstNote + i)"
             @leave="leaveNote(firstNote + i)"
           />
         </div>
 
-        <!-- Nature of the chord under the pointer, in the chord mode. The row
-             keeps its height whether or not a chord sounds, so the squares
-             above never shift while sweeping across them. -->
-        <div v-if="chordMode" class="flex h-7 items-center justify-center">
-          <span class="select-none text-base tracking-wide text-neutral-600">
-            {{ hoveredChord }}
-          </span>
+        <!-- What the chord under the pointer is, and how it is built: the two
+             sit close together so they read as one block, away from the row
+             of squares above. -->
+        <div v-if="chordMode" class="flex w-full flex-col gap-1">
+          <!-- The name row keeps its height whether or not a chord sounds, so
+               the squares above never shift while sweeping across them. -->
+          <div class="flex h-7 items-center justify-center">
+            <span class="select-none text-base tracking-wide text-neutral-600">
+              {{ hoveredChord }}
+            </span>
+          </div>
+
+          <!-- Geometry of the chord: the strip is always there while the
+               chord mode is on, and always starts at the same place, so only
+               the drawing of the chord moves. -->
+          <div
+            v-if="showChordStrip"
+            class="mx-auto flex max-w-full gap-1.5"
+            :style="chordStripStyle"
+          >
+            <Carre
+              v-for="offset in chordStripCells"
+              :key="offset"
+              :index="offset"
+              :label="chordStripLabel(offset)"
+              :in-chord="chordStripFilled(offset)"
+              :show-note="false"
+              inert
+            />
+          </div>
         </div>
       </div>
     </main>
@@ -697,6 +810,16 @@ function dismissOverlay() {
               />
               <span class="text-sm text-neutral-600">Nom des notes</span>
             </label>
+            <!-- Degrees only apply to a scale, not to an interval or a chord -->
+            <label v-if="sevenNoteScale" class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="labelMode"
+                type="radio"
+                value="degrees"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Degrés</span>
+            </label>
           </div>
 
           <!-- Label scope (applies to intervals and numbers alike) -->
@@ -744,6 +867,32 @@ function dismissOverlay() {
                   class="size-4 accent-neutral-800"
                 />
                 <span class="text-sm text-neutral-600">Bémols</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Spelling of the three ambiguous intervals, one pair per row -->
+          <div class="flex flex-col gap-2 pt-1">
+            <span class="text-sm font-medium tracking-wide text-neutral-600">
+              Affichage des intervalles
+            </span>
+            <div
+              v-for="choice in INTERVAL_CHOICES"
+              :key="choice.degree"
+              class="flex flex-wrap gap-x-6 gap-y-2"
+            >
+              <label
+                v-for="name in choice.names"
+                :key="name"
+                class="flex cursor-pointer items-center gap-2"
+              >
+                <input
+                  v-model="intervalNames[choice.degree]"
+                  type="radio"
+                  :value="name"
+                  class="size-4 accent-neutral-800"
+                />
+                <span class="text-sm text-neutral-600">{{ name }}</span>
               </label>
             </div>
           </div>
