@@ -49,8 +49,24 @@ const octaves = ref(3)
 // When enabled, squares are colored like piano keys (white / black).
 const pianoMode = ref(false)
 
-// Whether to display the note names below the squares.
+// Whether to display the note names below the squares, with their octave
+// number (Do4) or without it (Do). Only one of the two at a time: checking
+// one unchecks the other.
 const showNotes = ref(false)
+const showSimpleNotes = ref(false)
+watch(showNotes, (on) => {
+  if (on) showSimpleNotes.value = false
+})
+watch(showSimpleNotes, (on) => {
+  if (on) showNotes.value = false
+})
+
+// Name written below a square, following whichever of the two is checked.
+function squareNoteName(semitone) {
+  return showSimpleNotes.value
+    ? pitchClassName(semitone, useFlats.value)
+    : noteName(semitone, useFlats.value)
+}
 
 // Whether to display the frequencies (in Hz) below the note names.
 const showFrequencies = ref(false)
@@ -687,8 +703,8 @@ function dismissOverlay() {
             :index="i"
             :label="squareLabel(firstNote + i)"
             :mark-tonic="isOneNote(firstNote + i) && squareLabel(firstNote + i) !== null"
-            :note="noteName(firstNote + i, useFlats)"
-            :show-note="showNotes"
+            :note="squareNoteName(firstNote + i)"
+            :show-note="showNotes || showSimpleNotes"
             :frequency="`${Math.round(semitoneToFrequency(firstNote + i))} Hz`"
             :show-frequency="showFrequencies"
             :degree="squareDegree(firstNote + i)"
@@ -971,6 +987,19 @@ function dismissOverlay() {
           />
           <span class="text-sm font-medium tracking-wide text-neutral-600">
             Afficher les notes
+          </span>
+        </label>
+
+        <!-- Show note names without the octave number -->
+        <label for="show-simple-notes" class="flex cursor-pointer items-center gap-3">
+          <input
+            id="show-simple-notes"
+            v-model="showSimpleNotes"
+            type="checkbox"
+            class="size-4 accent-neutral-800"
+          />
+          <span class="text-sm font-medium tracking-wide text-neutral-600">
+            Afficher les notes simples
           </span>
         </label>
 

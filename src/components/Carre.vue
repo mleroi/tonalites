@@ -192,27 +192,28 @@ const playingClasses = computed(() => (props.playing ? 'z-10 scale-110' : ''))
 
     <!-- Note name, frequency and degree below the square, in that order; each
          is hidden only once the square gets too small for that particular
-         text. -->
+         text. Their size has no upper bound: it is as large as the square
+         width allows for the longest texts ("Sol#10", "1046 Hz"). -->
     <div
       v-if="showNote || showFrequency || degree !== null"
-      class="flex flex-col items-center gap-0.5"
+      class="flex flex-col items-center gap-[max(2px,4cqw)]"
     >
       <span
         v-if="showNote"
-        class="hidden select-none whitespace-nowrap text-[clamp(9px,16cqw,13px)] leading-none text-neutral-500 @min-[28px]:block"
+        class="hidden select-none whitespace-nowrap text-[max(9px,30cqw)] leading-none text-neutral-500 @min-[28px]:block"
       >
         {{ note }}
       </span>
       <span
         v-if="showFrequency"
-        class="hidden select-none whitespace-nowrap text-[clamp(8px,13cqw,11px)] leading-none text-neutral-400 @min-[40px]:block"
+        class="hidden select-none whitespace-nowrap text-[max(8px,22cqw)] leading-none text-neutral-400 @min-[40px]:block"
       >
         {{ frequency }}
       </span>
       <!-- Same type as the note name, so the two read as one stack. -->
       <span
         v-if="degree !== null"
-        class="hidden select-none whitespace-nowrap text-[clamp(9px,16cqw,13px)] leading-none text-neutral-500 @min-[28px]:block"
+        class="hidden select-none whitespace-nowrap text-[max(9px,30cqw)] leading-none text-neutral-500 @min-[28px]:block"
       >
         {{ degree }}
       </span>

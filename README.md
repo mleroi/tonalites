@@ -97,7 +97,8 @@ that, several layers help you read what you hear:
 - **Glissando band** for continuous pitch, showing the live frequency and the
   note name when it lands on an exact pitch.
 - **Piano mode** coloring (white/black keys).
-- **Optional note names and frequencies** shown below each square.
+- **Optional note names and frequencies** shown below each square; the names
+  can be written with their octave number (Do4) or without it (Do).
 
 ## Tech stack
 
