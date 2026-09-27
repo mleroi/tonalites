@@ -75,6 +75,10 @@ that, several layers help you read what you hear:
   read and compared from one chord to the next.
 - **Tessituras**: the range of an instrument (piano, guitar, bass, violin) or of
   a voice (soprano, alto, tenor, bass), shown as a pastel-yellow background.
+- **Marking notes by hand**: clicking a square marks it with a pastel-green
+  background (clicking it again unmarks it), to point at notes while teaching.
+  Marks survive any change of setting; a click in the empty area around the
+  squares, or the Escape key, clears them all.
 - **Accidentals** displayed as sharps or flats, applied everywhere.
 - **Interval spelling** for the three intervals that have two correct names,
   chosen by hand and applied everywhere intervals are written: `#4`/`b5`,

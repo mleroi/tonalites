@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import Carre from './components/Carre.vue'
 import {
   noteName,
@@ -505,19 +505,31 @@ function leaveNote(semitone) {
   }
 }
 
-// Mouse pressed on a square: re-strike and re-flash it in short mode — the
-// whole chord when in chord mode.
+// Notes marked by hand, as absolute semitones: a teaching aid to point at
+// notes. Being absolute, a mark stays on its note whatever the settings do —
+// shifting the first note moves it along with the row. Only a click in the
+// empty area around the squares, or the Escape key, clears them.
+const markedNotes = ref(new Set())
+
+// Mouse pressed on a square: mark it, or unmark it if it already was. The note
+// is not played here, hovering already does it.
 function pressNote(semitone) {
-  if (playMode.value !== 'short') return
-  if (chordMode.value) {
-    const chord = chordOn(semitone)
-    if (chord) chord.notes.forEach((n) => playAndFlash(n, 400))
-    return
-  }
-  if (isAudible(semitone)) {
-    playAndFlash(semitone, 250)
+  if (markedNotes.value.has(semitone)) {
+    markedNotes.value.delete(semitone)
+  } else {
+    markedNotes.value.add(semitone)
   }
 }
+
+function clearMarks() {
+  markedNotes.value.clear()
+}
+
+function onKeydown(e) {
+  if (e.key === 'Escape') clearMarks()
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 // Continuous glissando band shown above the squares (optional).
 const showGlide = ref(true)
@@ -609,8 +621,9 @@ function dismissOverlay() {
       </button>
     </div>
 
-    <!-- Squares display area -->
-    <main class="flex flex-1 items-center justify-center px-6">
+    <!-- Squares display area. A mouse down anywhere in it clears the marks:
+         the squares stop their own, so only the empty area reaches here. -->
+    <main class="flex flex-1 items-center justify-center px-6" @mousedown="clearMarks">
       <div class="flex w-full flex-col gap-3">
         <!-- Continuous glissando band, aligned with the squares row -->
         <div
@@ -655,6 +668,7 @@ function dismissOverlay() {
             :in-tessitura="inTessitura(firstNote + i)"
             :playing="playingNotes.has(firstNote + i)"
             :in-chord="hoveredChordNotes.includes(firstNote + i)"
+            :marked="markedNotes.has(firstNote + i)"
             @press="pressNote(firstNote + i)"
             @enter="enterNote(firstNote + i)"
             @leave="leaveNote(firstNote + i)"

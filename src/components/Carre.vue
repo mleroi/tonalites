@@ -84,6 +84,12 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Whether this note has been marked by a click (pastel-green background,
+  // held until cleared).
+  marked: {
+    type: Boolean,
+    default: false,
+  },
   // An inert square is there to be read, not played (the chord geometry
   // strip): it drops the hover, active and cursor affordances.
   inert: {
@@ -94,16 +100,22 @@ const props = defineProps({
 
 // 'press' fires on mouse down; 'enter' fires when the pointer moves onto the
 // square; 'leave' fires when it moves out (used to stop a sustained note).
+// The mouse down does not propagate, so that a click on a square is never
+// mistaken for a click on the empty area around the squares.
 const emit = defineEmits(['press', 'enter', 'leave'])
 
 // Background shades as [resting, hover, active]: piano-key colors when piano
 // mode is on, neutral otherwise. The chord highlight wins over every other
 // background, including the piano keys, so the notes of the chord read as one
 // block. Its hover shade is the same color, otherwise the square under the
-// pointer would stand out from the rest of its own chord.
+// pointer would stand out from the rest of its own chord. The mark comes next:
+// it is chosen by hand, so it wins over everything derived from the settings.
 const backgroundShades = computed(() => {
   if (props.inChord) {
     return ['bg-sky-200', 'hover:bg-sky-200', 'active:bg-sky-300']
+  }
+  if (props.marked) {
+    return ['bg-emerald-200', 'hover:bg-emerald-300', 'active:bg-emerald-300']
   }
   if (props.pianoMode) {
     return props.black
@@ -138,9 +150,11 @@ const borderClasses = computed(() => {
 })
 
 // The label must stay readable on a dark (black-key) background — unless the
-// chord highlight has replaced it with a light one.
+// chord highlight or the mark has replaced it with a light one.
 const labelClasses = computed(() =>
-  props.pianoMode && props.black && !props.inChord ? 'text-neutral-300' : 'text-neutral-500',
+  props.pianoMode && props.black && !props.inChord && !props.marked
+    ? 'text-neutral-300'
+    : 'text-neutral-500',
 )
 
 // Transient highlight while the note is being played (a subtle zoom).
@@ -154,7 +168,7 @@ const playingClasses = computed(() => (props.playing ? 'z-10 scale-110' : ''))
     <div
       class="flex aspect-square w-full items-center justify-center rounded-md transition duration-150"
       :class="[backgroundClasses, borderClasses, playingClasses, inert ? '' : 'cursor-pointer']"
-      @mousedown.prevent="emit('press')"
+      @mousedown.prevent.stop="emit('press')"
       @mouseenter="emit('enter')"
       @mouseleave="emit('leave')"
     >
