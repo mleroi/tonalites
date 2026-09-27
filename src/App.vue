@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import Carre from './components/Carre.vue'
 import {
   noteName,
@@ -39,21 +39,31 @@ import {
   setGlideFrequency,
   stopGlide,
 } from './audio.js'
+import { PRESETS, DEFAULT_PRESET, presetSettings } from './presets.js'
+
+// Every setting starts on the default preset (see presets.js).
+const defaults = DEFAULT_PRESET.settings
+
+// True while a preset is being applied. Some settings, when changed by hand,
+// adjust others (choosing a key sets the scale and the labels, choosing an
+// instrument sets the play mode); a preset states all of them itself, so
+// those watchers stand aside for as long as it is applied.
+let applyingPreset = false
 
 // Starting note of the first square, as an absolute semitone index (0 = Do1).
-const firstNote = ref(24)
+const firstNote = ref(defaults.firstNote)
 
 // Number of octaves selected by the slider (between 1 and 10).
-const octaves = ref(3)
+const octaves = ref(defaults.octaves)
 
 // When enabled, squares are colored like piano keys (white / black).
-const pianoMode = ref(false)
+const pianoMode = ref(defaults.pianoMode)
 
 // Whether to display the note names below the squares, with their octave
 // number (Do4) or without it (Do). Only one of the two at a time: checking
 // one unchecks the other.
-const showNotes = ref(false)
-const showSimpleNotes = ref(false)
+const showNotes = ref(defaults.showNotes)
+const showSimpleNotes = ref(defaults.showSimpleNotes)
 watch(showNotes, (on) => {
   if (on) showSimpleNotes.value = false
 })
@@ -69,21 +79,21 @@ function squareNoteName(semitone) {
 }
 
 // Whether to display the frequencies (in Hz) below the note names.
-const showFrequencies = ref(false)
+const showFrequencies = ref(defaults.showFrequencies)
 
 // Note that carries the number "1", as an absolute semitone index (0 = Do1).
-const numberStart = ref(36)
+const numberStart = ref(defaults.numberStart)
 
 // Continuous background drone.
-const droneOn = ref(false)
+const droneOn = ref(defaults.droneOn)
 
 // Drone note, as an absolute semitone index (0 = Do1), independent of the
 // "note du 1".
-const droneNote = ref(36)
+const droneNote = ref(defaults.droneNote)
 
 // Drone volume on the displayed 0..100 scale, which maps to 0..50% of the
 // actual level (so the displayed 100 is half the level of the played notes).
-const droneVolume = ref(50)
+const droneVolume = ref(defaults.droneVolume)
 
 // Start/stop the drone when toggled, and follow its own note while active.
 watch(droneOn, (on) => {
@@ -102,14 +112,14 @@ watch(droneVolume, (v) => setDroneVolume(v / 2))
 // Label content shown in squares: 'none', 'intervals' (R, b2, M2…),
 // 'numbers' (1..12) or 'names' (Do, Ré…). Intervals/numbers are counted from
 // the "note du 1" (degree 0); names are the absolute pitch class.
-const labelMode = ref('none')
+const labelMode = ref(defaults.labelMode)
 
 // Label scope: 'single' = only the octave starting on the "note du 1",
 // 'all' = every octave. Applies to both intervals and numbers.
-const labelScope = ref('single')
+const labelScope = ref(defaults.labelScope)
 
 // How accidentals are written everywhere note names appear: 'sharps' or 'flats'.
-const accidentals = ref('sharps')
+const accidentals = ref(defaults.accidentals)
 const useFlats = computed(() => accidentals.value === 'flats')
 
 // Three intervals have two equally correct names, and which one applies
@@ -123,9 +133,7 @@ const INTERVAL_CHOICES = [
   { degree: 8, names: ['b6', '#5'] },
   { degree: 9, names: ['M6', '7°'] },
 ]
-const intervalNames = ref(
-  Object.fromEntries(INTERVAL_CHOICES.map(({ degree, names }) => [degree, names[0]])),
-)
+const intervalNames = ref({ ...defaults.intervalNames })
 
 // Name of the interval `degree` semitones above the reference note.
 function intervalName(degree) {
@@ -134,10 +142,10 @@ function intervalName(degree) {
 
 // Selected key ('' = none). Choosing one moves the "note du 1" to its tonic in
 // octave 4 (Do4 = semitone 36) and adapts the accidentals spelling.
-const keyChoice = ref('')
+const keyChoice = ref(defaults.keyChoice)
 watch(keyChoice, (k) => {
   const key = KEYS.find((x) => x.key === k)
-  if (!key) return
+  if (!key || applyingPreset) return
   numberStart.value = 36 + key.pitchClass
   accidentals.value = key.accidentals
   scaleKey.value = 'ionian' // Gamme majeure
@@ -156,7 +164,7 @@ watch([numberStart, accidentals], () => {
 
 // When enabled, every "1" (the tonic and its octaves) is highlighted, even
 // when its number is not displayed.
-const highlightOnes = ref(true)
+const highlightOnes = ref(defaults.highlightOnes)
 
 // True if the note is a "1" (an octave of the "note du 1").
 function isOneNote(semitone) {
@@ -164,25 +172,25 @@ function isOneNote(semitone) {
 }
 
 // Selected scale key ('' = no scale). Its tonic is the "note du 1".
-const scaleKey = ref('')
+const scaleKey = ref(defaults.scaleKey)
 
 // Audio mode for scales: 'scale-only' = only scale notes are heard,
 // 'all' = every note is heard. Only relevant while a scale is selected.
-const scaleAudioMode = ref('scale-only')
+const scaleAudioMode = ref(defaults.scaleAudioMode)
 
 // Highlight scope: 'single' = highlight only the octave of the "note du 1",
 // 'all' = highlight scale notes across every octave.
-const scaleHighlightMode = ref('single')
+const scaleHighlightMode = ref(defaults.scaleHighlightMode)
 
 // When a scale is selected, hide the labels of squares that are not
 // highlighted (i.e. only scale notes keep their inner label).
-const hideLabelsOutOfScale = ref(true)
+const hideLabelsOutOfScale = ref(defaults.hideLabelsOutOfScale)
 
 // The currently selected scale object, or null when none is selected.
 const selectedScale = computed(() => SCALES.find((s) => s.key === scaleKey.value) || null)
 
 // Whether to write each scale note's degree in Roman numerals below its square.
-const showDegrees = ref(false)
+const showDegrees = ref(defaults.showDegrees)
 
 // True when the selection is one of the seven-note scales. Both the degrees
 // and the chord-listening mode depend on this: intervals and chords are not
@@ -220,7 +228,7 @@ function scalesOfType(type) {
 }
 
 // Selected tessitura ('' = none); its notes get a pastel-yellow background.
-const tessituraChoice = ref('')
+const tessituraChoice = ref(defaults.tessituraChoice)
 const selectedTessitura = computed(
   () => TESSITURAS.find((t) => t.key === tessituraChoice.value) || null,
 )
@@ -364,7 +372,7 @@ function squareLabel(semitone) {
 // Sound of the squares: '' = the built-in synth, otherwise an instrument key
 // from the registry. A sampled instrument downloads its samples on selection,
 // during which the synth keeps playing.
-const instrumentKey = ref('')
+const instrumentKey = ref(defaults.instrumentKey)
 const instrumentLoading = ref(false)
 
 // Identifies the latest selection, so that a slow load which is no longer the
@@ -378,7 +386,7 @@ watch(instrumentKey, async (key) => {
 })
 
 // Number of notes in the chords played by the chord-listening mode.
-const chordSize = ref(3)
+const chordSize = ref(defaults.chordSize)
 
 // True when hovering a square should play a chord rather than a single note.
 // Guarded by the scale type, so a selection left on 'chords' while switching
@@ -445,7 +453,15 @@ function chordOn(semitone) {
 
 // Play mode: 'short' = a brief note on hover (default), 'sustain' = the note
 // rings as long as the pointer stays inside the square.
-const playMode = ref('short')
+const playMode = ref(defaults.playMode)
+
+// Sampled instruments (piano, guitar) ring and decay on their own, so they are
+// best heard held; the synth is back to short notes. Only on a change of
+// sound: the play mode can still be switched by hand afterwards.
+watch(instrumentKey, (key) => {
+  if (applyingPreset) return
+  playMode.value = key === '' ? 'short' : 'sustain'
+})
 
 // Releasing any stuck sustained note (and its highlight) when leaving the
 // sustain mode.
@@ -640,7 +656,7 @@ function onPanEnd() {
 onUnmounted(onPanEnd)
 
 // Continuous glissando band shown above the squares (optional).
-const showGlide = ref(true)
+const showGlide = ref(defaults.showGlide)
 
 // Template ref to the glissando band, used to map pointer X to a pitch.
 const glideTrack = ref(null)
@@ -712,6 +728,75 @@ function dismissOverlay() {
   startAudio()
   showOverlay.value = false
 }
+
+// The settings a preset can set, by the name used in presets.js.
+const SETTINGS = {
+  firstNote,
+  octaves,
+  numberStart,
+  highlightOnes,
+  labelMode,
+  labelScope,
+  accidentals,
+  intervalNames,
+  showGlide,
+  showNotes,
+  showSimpleNotes,
+  showFrequencies,
+  pianoMode,
+  droneOn,
+  droneNote,
+  droneVolume,
+  scaleKey,
+  scaleAudioMode,
+  chordSize,
+  scaleHighlightMode,
+  hideLabelsOutOfScale,
+  showDegrees,
+  playMode,
+  instrumentKey,
+  keyChoice,
+  tessituraChoice,
+}
+
+// A preset file edited by hand can easily hold a typo: report the names that
+// match no setting, rather than silently ignoring them.
+for (const preset of PRESETS) {
+  for (const name of Object.keys(preset.settings)) {
+    if (!(name in SETTINGS)) console.warn(`Preset "${preset.key}": unknown setting "${name}"`)
+  }
+}
+
+// Apply a preset. The watchers triggered by the new values run on the next
+// flush, so the flag is only lowered once that flush is done.
+function applyPreset(key) {
+  const preset = PRESETS.find((p) => p.key === key)
+  if (!preset) return
+  applyingPreset = true
+  for (const [name, value] of Object.entries(presetSettings(preset))) {
+    if (!(name in SETTINGS)) continue
+    SETTINGS[name].value = typeof value === 'object' ? { ...value } : value
+  }
+  nextTick(() => {
+    applyingPreset = false
+  })
+}
+
+// The preset matching the current settings, or '' once any of them has been
+// changed by hand (the dropdown then reads "Personnalisé", and choosing the
+// preset again restores it). Values are compared as JSON, which also covers
+// the interval spellings object.
+const currentPreset = computed(() => {
+  const matches = (preset) =>
+    Object.entries(presetSettings(preset)).every(
+      ([name, value]) =>
+        !(name in SETTINGS) || JSON.stringify(SETTINGS[name].value) === JSON.stringify(value),
+    )
+  return PRESETS.find(matches)?.key ?? ''
+})
+
+// Whether the detailed settings are shown below the main ones.
+const showAllSettings = ref(false)
 </script>
 
 <template>
@@ -829,7 +914,60 @@ function dismissOverlay() {
 
     <!-- Controls -->
     <footer class="border-t border-neutral-100 px-6 py-8">
-      <div class="mx-auto grid max-w-6xl grid-cols-1 items-start gap-x-10 gap-y-6 md:grid-cols-2 lg:grid-cols-4">
+      <div class="mx-auto flex max-w-6xl flex-col gap-8">
+      <!-- Main settings, always shown: on the same grid as the detailed ones
+           below, so their columns line up. -->
+      <div class="grid grid-cols-1 items-end gap-x-10 gap-y-6 md:grid-cols-2 lg:grid-cols-4">
+        <!-- Preset: a whole set of settings at once (see presets.js) -->
+        <div class="flex flex-col gap-3">
+          <label for="preset" class="text-sm font-medium tracking-wide text-neutral-600">
+            Presets
+          </label>
+          <select
+            id="preset"
+            :value="currentPreset"
+            class="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
+            @change="applyPreset($event.target.value)"
+          >
+            <option v-if="currentPreset === ''" value="" disabled>Personnalisé</option>
+            <option v-for="p in PRESETS" :key="p.key" :value="p.key">{{ p.label }}</option>
+          </select>
+        </div>
+
+        <!-- Sound: the built-in synth or a sampled instrument -->
+        <div class="flex flex-col gap-3">
+          <div class="flex items-baseline justify-between">
+            <label for="instrument" class="text-sm font-medium tracking-wide text-neutral-600">
+              Sonorité
+            </label>
+            <span v-if="instrumentLoading" class="text-sm text-neutral-400">chargement…</span>
+          </div>
+          <select
+            id="instrument"
+            v-model="instrumentKey"
+            class="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
+          >
+            <option value="">Synthétiseur</option>
+            <option v-for="i in INSTRUMENTS" :key="i.key" :value="i.key">{{ i.label }}</option>
+          </select>
+        </div>
+
+        <!-- Show or hide the detailed settings -->
+        <button
+          type="button"
+          class="cursor-pointer justify-self-start rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100 lg:col-start-4 lg:justify-self-end"
+          :aria-expanded="showAllSettings"
+          @click="showAllSettings = !showAllSettings"
+        >
+          {{ showAllSettings ? 'Masquer les réglages ▴' : 'Tous les réglages ▾' }}
+        </button>
+      </div>
+
+      <!-- Detailed settings, hidden by default -->
+      <div
+        v-if="showAllSettings"
+        class="grid grid-cols-1 items-start gap-x-10 gap-y-6 border-t border-neutral-100 pt-8 md:grid-cols-2 lg:grid-cols-4"
+      >
         <!-- Column 1: notes, octaves, numbering -->
         <div class="flex flex-col gap-6">
         <!-- First note -->
@@ -1315,26 +1453,8 @@ function dismissOverlay() {
         </div>
         </div>
 
-        <!-- Column 4: sound, keys, tessituras -->
+        <!-- Column 4: keys, tessituras -->
         <div class="flex flex-col gap-6">
-        <!-- Sound: the built-in synth or a sampled instrument -->
-        <div class="flex flex-col gap-3">
-          <div class="flex items-baseline justify-between">
-            <label for="instrument" class="text-sm font-medium tracking-wide text-neutral-600">
-              Sonorité
-            </label>
-            <span v-if="instrumentLoading" class="text-sm text-neutral-400">chargement…</span>
-          </div>
-          <select
-            id="instrument"
-            v-model="instrumentKey"
-            class="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
-          >
-            <option value="">Synthétiseur</option>
-            <option v-for="i in INSTRUMENTS" :key="i.key" :value="i.key">{{ i.label }}</option>
-          </select>
-        </div>
-
         <!-- Key (tonalité) -->
         <div class="flex flex-col gap-3">
           <label for="key" class="text-sm font-medium tracking-wide text-neutral-600">
@@ -1371,6 +1491,7 @@ function dismissOverlay() {
           </select>
         </div>
         </div>
+      </div>
       </div>
     </footer>
   </div>

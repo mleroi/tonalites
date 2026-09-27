@@ -37,6 +37,10 @@ that, several layers help you read what you hear:
 
 ## Features
 
+- **Presets**: named sets of settings applied in one go, listed in
+  `src/presets.js`; the app starts on the default one. Only the preset and
+  the sound are shown at first, every other setting sits behind "Tous les
+  réglages".
 - **Chromatic row** that always fits the width of the screen, centered, on a
   single line, with squares that scale to the number of notes.
 - **First note** and **number of octaves** sliders (Do1–Do7, 1–10 octaves).
@@ -90,7 +94,8 @@ that, several layers help you read what you hear:
   diminished fifth in a diminished chord, an augmented fourth otherwise), and
   the app deliberately does not guess.
 - **Playback modes**: short note on hover, or sustained while the pointer stays
-  on the square.
+  on the square. Choosing a sampled instrument switches to sustained notes,
+  going back to the synth switches to short ones.
 - **Sound ("Sonorité")**: the built-in synth, or a sampled instrument — an
   acoustic piano or an acoustic guitar. Samples are only downloaded when the
   instrument is selected, and the synth keeps playing meanwhile, so the app is
@@ -155,12 +160,22 @@ src/
   audio.js             Tone.js setup: notes, drone, glissando, samplers
   notes.js             Note names, intervals, scales, helpers
   instruments.js       Registry of sampled instruments (samples, levels)
+  presets.js           Presets: named sets of settings, the first is the default
   main.js              App entry point
   style.css            Tailwind entry
 public/
   samples/piano/       The 30 piano samples, served as static files
   samples/guitar/      The 13 guitar samples, likewise
 ```
+
+### Adding a preset
+
+Append an entry to `PRESETS` in `src/presets.js`: a unique `key`, the `label`
+shown in the dropdown, and the `settings` it changes, by name. Settings left
+out take the value of the default preset (the first one), so a preset always
+leads to the same screen. The comment at the top of the file lists every
+setting and its possible values; an unknown name is reported in the browser
+console.
 
 ### Adding a sampled instrument
 
