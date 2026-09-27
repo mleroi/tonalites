@@ -471,6 +471,9 @@ watch([chordSize, scaleAudioMode, chordMode], () => {
 // and highlight it (briefly in short mode, until leaving in sustain mode).
 // In chord mode the whole chord is played and highlighted instead.
 function enterNote(semitone) {
+  // While dragging the keyboard, the squares slide under the pointer: none of
+  // them should sound.
+  if (panning.value) return
   if (chordMode.value) {
     const chord = chordOn(semitone)
     if (!chord) {
@@ -555,12 +558,35 @@ function setNumberStart(semitone) {
 // per gesture; a regular mouse notch (about 100) is one octave.
 const WHEEL_STEP = 100
 let wheelAccumulator = 0
+
+// Template ref to the notes row, to find which note is above or below the
+// pointer when zooming.
+const notesRow = ref(null)
+
 function onPlayAreaWheel(e) {
   wheelAccumulator += e.deltaY
   const steps = Math.trunc(wheelAccumulator / WHEEL_STEP)
   if (steps === 0) return
   wheelAccumulator -= steps * WHEEL_STEP
+  const oldCount = carres.value.length
   octaves.value = Math.max(1, Math.min(10, octaves.value + steps))
+  anchorZoom(e.clientX, oldCount, octaves.value * 12)
+}
+
+// Zoom around the pointer: the note in the pointer's column keeps its place
+// on screen, the row stretching or shrinking around it. Every square and its
+// gap take an equal share of the row, so the pointer's position as a fraction
+// of the row width tells how many squares lie to its left; the first note is
+// shifted so that, with the new count, the same note sits at that same
+// fraction. Rounded to a whole semitone and clamped to the first note's
+// range, so near the ends of the keyboard the anchor can drift a little.
+function anchorZoom(clientX, oldCount, newCount) {
+  if (!notesRow.value || oldCount === newCount) return
+  const rect = notesRow.value.getBoundingClientRect()
+  const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+  const anchor = firstNote.value + fraction * oldCount
+  const first = Math.round(anchor - fraction * newCount)
+  firstNote.value = Math.max(MIN_NOTE, Math.min(MAX_NOTE, first))
 }
 
 function clearMarks() {
@@ -572,6 +598,46 @@ function onKeydown(e) {
 }
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+
+// Dragging the empty play area scrolls the keyboard sideways: the note in the
+// pointer's column follows the pointer, as if pulled along, by moving the
+// first note one semitone per square width travelled. A press released
+// without moving past a few pixels stays a plain click, which clears the
+// marks — so the marks are only cleared on release, once it is known that
+// the press was not a drag. The glissando band is left out: it is played by
+// moving over it, so dragging there would do both at once.
+const PAN_THRESHOLD = 4
+const panning = ref(false)
+let panStart = null
+
+function onPlayAreaMousedown(e) {
+  if (glideTrack.value?.contains(e.target)) {
+    clearMarks()
+    return
+  }
+  panStart = { x: e.clientX, firstNote: firstNote.value }
+  window.addEventListener('mousemove', onPanMove)
+  window.addEventListener('mouseup', onPanEnd)
+}
+
+function onPanMove(e) {
+  const dx = e.clientX - panStart.x
+  if (!panning.value && Math.abs(dx) < PAN_THRESHOLD) return
+  panning.value = true
+  // Every square and its gap take an equal share of the row.
+  const slot = notesRow.value.getBoundingClientRect().width / carres.value.length
+  const first = Math.round(panStart.firstNote - dx / slot)
+  firstNote.value = Math.max(MIN_NOTE, Math.min(MAX_NOTE, first))
+}
+
+function onPanEnd() {
+  if (!panning.value) clearMarks()
+  panning.value = false
+  panStart = null
+  window.removeEventListener('mousemove', onPanMove)
+  window.removeEventListener('mouseup', onPanEnd)
+}
+onUnmounted(onPanEnd)
 
 // Continuous glissando band shown above the squares (optional).
 const showGlide = ref(true)
@@ -623,6 +689,8 @@ function updateGlide(clientX, attack) {
 // Hovering the band is enough to play: start on enter, follow on move, stop
 // on leave (no click required, like the squares).
 function onGlideEnter(e) {
+  // Crossing the band while dragging the keyboard should not play it.
+  if (panning.value) return
   gliding.value = true
   updateGlide(e.clientX, true)
 }
@@ -663,12 +731,14 @@ function dismissOverlay() {
       </button>
     </div>
 
-    <!-- Squares display area. A left mouse down anywhere in it clears the
-         marks, and the wheel zooms instead of scrolling the page: the squares
-         stop both events, so only the empty area reaches here. -->
+    <!-- Squares display area. A left click anywhere in it clears the marks,
+         dragging it scrolls the keyboard, and the wheel zooms instead of
+         scrolling the page: the squares stop these events, so only the empty
+         area reaches here. -->
     <main
       class="flex flex-1 items-center justify-center px-6"
-      @mousedown.left="clearMarks"
+      :class="panning ? 'cursor-grabbing' : 'cursor-grab'"
+      @mousedown.left.prevent="onPlayAreaMousedown"
       @wheel.prevent="onPlayAreaWheel"
     >
       <div class="flex w-full flex-col gap-3">
@@ -696,7 +766,7 @@ function dismissOverlay() {
         </div>
 
         <!-- Notes row -->
-        <div class="flex w-full items-start gap-1.5">
+        <div ref="notesRow" class="flex w-full items-start gap-1.5">
           <Carre
             v-for="i in carres"
             :key="i"
