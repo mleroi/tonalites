@@ -98,11 +98,17 @@ const props = defineProps({
   },
 })
 
-// 'press' fires on mouse down; 'enter' fires when the pointer moves onto the
-// square; 'leave' fires when it moves out (used to stop a sustained note).
-// The mouse down does not propagate, so that a click on a square is never
-// mistaken for a click on the empty area around the squares.
-const emit = defineEmits(['press', 'enter', 'leave'])
+// 'press' fires on a left mouse down; 'secondary-press' on a right click (the
+// browser context menu is suppressed); 'enter' fires when the pointer moves
+// onto the square; 'leave' fires when it moves out (used to stop a sustained
+// note). No mouse down propagates, whatever the button, so that a click on a
+// square is never mistaken for a click on the empty area around the squares;
+// the wheel does not either, the zoom being reserved for that empty area.
+const emit = defineEmits(['press', 'secondary-press', 'enter', 'leave'])
+
+function onMousedown(e) {
+  if (e.button === 0) emit('press')
+}
 
 // Background shades as [resting, hover, active]: piano-key colors when piano
 // mode is on, neutral otherwise. The chord highlight wins over every other
@@ -168,7 +174,9 @@ const playingClasses = computed(() => (props.playing ? 'z-10 scale-110' : ''))
     <div
       class="flex aspect-square w-full items-center justify-center rounded-md transition duration-150"
       :class="[backgroundClasses, borderClasses, playingClasses, inert ? '' : 'cursor-pointer']"
-      @mousedown.prevent.stop="emit('press')"
+      @mousedown.prevent.stop="onMousedown"
+      @contextmenu.prevent="emit('secondary-press')"
+      @wheel.stop
       @mouseenter="emit('enter')"
       @mouseleave="emit('leave')"
     >

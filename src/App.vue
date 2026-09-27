@@ -521,6 +521,32 @@ function pressNote(semitone) {
   }
 }
 
+// Right click on a square: make it the "note du 1". A note beyond the range of
+// the "note du 1" slider is brought back into it by whole octaves, so that at
+// least the numbering follows the clicked pitch class.
+function setNumberStart(semitone) {
+  let n = semitone
+  while (n > MAX_NUMBER_START) n -= 12
+  while (n < MIN_NUMBER_START) n += 12
+  numberStart.value = n
+}
+
+// Mouse wheel in the empty play area zooms: scrolling up shows fewer octaves
+// (the squares grow), scrolling down shows more. Not over the squares
+// themselves, where the zoom would slide another note under the pointer and
+// play it. Wheel deltas are accumulated so
+// that a trackpad, which sends many small ones, does not jump several octaves
+// per gesture; a regular mouse notch (about 100) is one octave.
+const WHEEL_STEP = 100
+let wheelAccumulator = 0
+function onPlayAreaWheel(e) {
+  wheelAccumulator += e.deltaY
+  const steps = Math.trunc(wheelAccumulator / WHEEL_STEP)
+  if (steps === 0) return
+  wheelAccumulator -= steps * WHEEL_STEP
+  octaves.value = Math.max(1, Math.min(10, octaves.value + steps))
+}
+
 function clearMarks() {
   markedNotes.value.clear()
 }
@@ -621,9 +647,14 @@ function dismissOverlay() {
       </button>
     </div>
 
-    <!-- Squares display area. A mouse down anywhere in it clears the marks:
-         the squares stop their own, so only the empty area reaches here. -->
-    <main class="flex flex-1 items-center justify-center px-6" @mousedown="clearMarks">
+    <!-- Squares display area. A left mouse down anywhere in it clears the
+         marks, and the wheel zooms instead of scrolling the page: the squares
+         stop both events, so only the empty area reaches here. -->
+    <main
+      class="flex flex-1 items-center justify-center px-6"
+      @mousedown.left="clearMarks"
+      @wheel.prevent="onPlayAreaWheel"
+    >
       <div class="flex w-full flex-col gap-3">
         <!-- Continuous glissando band, aligned with the squares row -->
         <div
@@ -670,6 +701,7 @@ function dismissOverlay() {
             :in-chord="hoveredChordNotes.includes(firstNote + i)"
             :marked="markedNotes.has(firstNote + i)"
             @press="pressNote(firstNote + i)"
+            @secondary-press="setNumberStart(firstNote + i)"
             @enter="enterNote(firstNote + i)"
             @leave="leaveNote(firstNote + i)"
           />

@@ -78,7 +78,9 @@ that, several layers help you read what you hear:
 - **Marking notes by hand**: clicking a square marks it with a pastel-green
   background (clicking it again unmarks it), to point at notes while teaching.
   Marks survive any change of setting; a click in the empty area around the
-  squares, or the Escape key, clears them all.
+  squares, or the Escape key, clears them all. A right click on a square makes
+  it the "note du 1" instead, and the mouse wheel in the empty play area (not
+  over the squares) zooms by changing the number of octaves.
 - **Accidentals** displayed as sharps or flats, applied everywhere.
 - **Interval spelling** for the three intervals that have two correct names,
   chosen by hand and applied everywhere intervals are written: `#4`/`b5`,
