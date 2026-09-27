@@ -90,6 +90,11 @@ that, several layers help you read what you hear:
   by changing the number of octaves, centered on the note in the pointer's
   column. Dragging the empty play area sideways scrolls the keyboard, the note
   in the pointer's column following the pointer.
+- **Keyboard shortcuts**: `F1`–`F4` pick the label mode, from "Numérotation"
+  to "Degrés" (pressing again the key of the current mode goes back to
+  "Aucun"), `a` shows the labels and the scale highlight on every octave or
+  on a single one, `t` switches between sustained and short notes, `d`
+  starts or stops the drone, and `Escape` clears the marks.
 - **Accidentals** displayed as sharps or flats, applied everywhere.
 - **Interval spelling** for the three intervals that have two correct names,
   chosen by hand and applied everywhere intervals are written: `#4`/`b5`,

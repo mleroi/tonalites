@@ -627,8 +627,56 @@ function clearMarks() {
   markedNotes.value.clear()
 }
 
+// Label modes reached with F1..F4, in the order of the radio buttons after
+// "Aucun" (reached by pressing again the key of the current mode).
+const LABEL_MODE_KEYS = { F1: 'numbers', F2: 'intervals', F3: 'names', F4: 'degrees' }
+
+// Keyboard shortcuts:
+//   Escape   clear the marks
+//   F1..F4   label mode, from "Numérotation" to "Degrés"; pressing again the
+//            key of the mode already on goes back to "Aucun". Like its radio
+//            button, "Degrés" is only there with a seven-note scale
+//   d        drone on/off
+//   a        labels and scale highlight on every octave, or on a single one
+//            (both follow the labels, so that one press brings them in line)
+//   t        sustained notes, or short ones
+// Left alone when Ctrl, Alt or Cmd is held, so as not to steal the browser's
+// own shortcuts. They work even when a dropdown has the focus — which it keeps
+// after an option is picked, a preset for instance — so the key is then kept
+// from also selecting the option starting with that letter. Auto-repeat is
+// ignored, so holding a key does not toggle it on and off.
+const LETTER_SHORTCUTS = {
+  d: () => {
+    droneOn.value = !droneOn.value
+  },
+  a: () => {
+    const scope = labelScope.value === 'all' ? 'single' : 'all'
+    labelScope.value = scope
+    scaleHighlightMode.value = scope
+  },
+  t: () => {
+    playMode.value = playMode.value === 'sustain' ? 'short' : 'sustain'
+  },
+}
+
 function onKeydown(e) {
-  if (e.key === 'Escape') clearMarks()
+  if (e.key === 'Escape') {
+    clearMarks()
+    return
+  }
+  if (e.ctrlKey || e.altKey || e.metaKey) return
+  const mode = LABEL_MODE_KEYS[e.key]
+  const letter = LETTER_SHORTCUTS[e.key.toLowerCase()]
+  if (!mode && !letter) return
+  // Also keeps F1 from opening the help in some browsers.
+  e.preventDefault()
+  if (e.repeat) return
+  if (mode) {
+    if (mode === 'degrees' && !sevenNoteScale.value) return
+    labelMode.value = labelMode.value === mode ? 'none' : mode
+  } else {
+    letter()
+  }
 }
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => window.removeEventListener('keydown', onKeydown))
