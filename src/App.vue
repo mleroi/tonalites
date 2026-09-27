@@ -560,10 +560,28 @@ function pressNote(semitone) {
 // the "note du 1" slider is brought back into it by whole octaves, so that at
 // least the numbering follows the clicked pitch class.
 function setNumberStart(semitone) {
+  numberStart.value = intoSliderRange(semitone)
+}
+
+// A note brought into the range of the "note du 1" and drone note sliders by
+// whole octaves.
+function intoSliderRange(semitone) {
   let n = semitone
   while (n > MAX_NUMBER_START) n -= 12
   while (n < MIN_NUMBER_START) n += 12
-  numberStart.value = n
+  return n
+}
+
+// Ctrl + click on a square: make it the drone note and start the drone, or,
+// on the note the drone is already playing, stop it.
+function toggleDrone(semitone) {
+  const n = intoSliderRange(semitone)
+  if (droneOn.value && droneNote.value === n) {
+    droneOn.value = false
+    return
+  }
+  droneNote.value = n
+  droneOn.value = true
 }
 
 // Mouse wheel in the empty play area zooms: scrolling up shows fewer octaves
@@ -871,7 +889,9 @@ const showAllSettings = ref(false)
             :playing="playingNotes.has(firstNote + i)"
             :in-chord="hoveredChordNotes.includes(firstNote + i)"
             :marked="markedNotes.has(firstNote + i)"
+            :drone="droneOn && droneNote === firstNote + i"
             @press="pressNote(firstNote + i)"
+            @modifier-press="toggleDrone(firstNote + i)"
             @secondary-press="setNumberStart(firstNote + i)"
             @enter="enterNote(firstNote + i)"
             @leave="leaveNote(firstNote + i)"
@@ -951,6 +971,22 @@ const showAllSettings = ref(false)
             <option v-for="i in INSTRUMENTS" :key="i.key" :value="i.key">{{ i.label }}</option>
           </select>
         </div>
+
+        <!-- Drone on/off, also found with its note and volume in the detailed
+             settings: here so that it can be stopped even when its note is
+             out of view. Its note is named, for the same reason. -->
+        <label for="drone-main" class="flex cursor-pointer items-center gap-3 py-2">
+          <input
+            id="drone-main"
+            v-model="droneOn"
+            type="checkbox"
+            class="size-4 accent-neutral-800"
+          />
+          <span class="text-sm font-medium tracking-wide text-neutral-600">Drone</span>
+          <span v-if="droneOn" class="text-sm tabular-nums text-neutral-400">
+            {{ droneNoteName }}
+          </span>
+        </label>
 
         <!-- Show or hide the detailed settings -->
         <button

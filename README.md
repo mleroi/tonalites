@@ -38,9 +38,9 @@ that, several layers help you read what you hear:
 ## Features
 
 - **Presets**: named sets of settings applied in one go, listed in
-  `src/presets.js`; the app starts on the default one. Only the preset and
-  the sound are shown at first, every other setting sits behind "Tous les
-  réglages".
+  `src/presets.js`; the app starts on the default one. Only the preset, the
+  sound and the drone switch are shown at first, every other setting sits
+  behind "Tous les réglages".
 - **Chromatic row** that always fits the width of the screen, centered, on a
   single line, with squares that scale to the number of notes.
 - **First note** and **number of octaves** sliders (Do1–Do7, 1–10 octaves).
@@ -83,10 +83,13 @@ that, several layers help you read what you hear:
   background (clicking it again unmarks it), to point at notes while teaching.
   Marks survive any change of setting; a click in the empty area around the
   squares, or the Escape key, clears them all. A right click on a square makes
-  it the "note du 1" instead, and the mouse wheel in the empty play area (not
-  over the squares) zooms by changing the number of octaves, centered on the
-  note in the pointer's column. Dragging the empty play area sideways scrolls
-  the keyboard, the note in the pointer's column following the pointer.
+  it the "note du 1" instead, and a Ctrl + click (Cmd + click on a Mac) makes
+  it the drone note and starts the drone — shown with a pale fuchsia
+  background and a breathing glow — or stops it when clicked on the drone note
+  itself. The mouse wheel in the empty play area (not over the squares) zooms
+  by changing the number of octaves, centered on the note in the pointer's
+  column. Dragging the empty play area sideways scrolls the keyboard, the note
+  in the pointer's column following the pointer.
 - **Accidentals** displayed as sharps or flats, applied everywhere.
 - **Interval spelling** for the three intervals that have two correct names,
   chosen by hand and applied everywhere intervals are written: `#4`/`b5`,

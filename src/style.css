@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+@theme {
+  /* Slow breathing glow around the drone note's square, like the held
+     sound it stands for. */
+  --animate-drone-glow: drone-glow 2.4s ease-in-out infinite;
+
+  @keyframes drone-glow {
+    0%,
+    100% {
+      box-shadow: 0 0 4px 1px color-mix(in oklab, var(--color-fuchsia-400) 50%, transparent);
+    }
+    50% {
+      box-shadow: 0 0 16px 5px color-mix(in oklab, var(--color-fuchsia-400) 80%, transparent);
+    }
+  }
+}
+
 html,
 body,
 #app {

@@ -90,6 +90,12 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Whether this note is the one the drone is playing (pale fuchsia
+  // background and a breathing glow, in the color of the "1" border).
+  drone: {
+    type: Boolean,
+    default: false,
+  },
   // An inert square is there to be read, not played (the chord geometry
   // strip): it drops the hover, active and cursor affordances.
   inert: {
@@ -98,16 +104,25 @@ const props = defineProps({
   },
 })
 
-// 'press' fires on a left mouse down; 'secondary-press' on a right click (the
+// 'press' fires on a left mouse down; 'modifier-press' on a left mouse down
+// with Ctrl (or Cmd on a Mac) held; 'secondary-press' on a right click (the
 // browser context menu is suppressed); 'enter' fires when the pointer moves
 // onto the square; 'leave' fires when it moves out (used to stop a sustained
 // note). No mouse down propagates, whatever the button, so that a click on a
 // square is never mistaken for a click on the empty area around the squares;
 // the wheel does not either, the zoom being reserved for that empty area.
-const emit = defineEmits(['press', 'secondary-press', 'enter', 'leave'])
+const emit = defineEmits(['press', 'modifier-press', 'secondary-press', 'enter', 'leave'])
 
 function onMousedown(e) {
-  if (e.button === 0) emit('press')
+  if (e.button !== 0) return
+  emit(e.ctrlKey || e.metaKey ? 'modifier-press' : 'press')
+}
+
+// On a Mac, Ctrl + click also opens the context menu: that one is the
+// modifier press above, not a right click.
+function onContextmenu(e) {
+  if (e.ctrlKey && e.button === 0) return
+  emit('secondary-press')
 }
 
 // Background shades as [resting, hover, active]: piano-key colors when piano
@@ -116,12 +131,17 @@ function onMousedown(e) {
 // block. Its hover shade is the same color, otherwise the square under the
 // pointer would stand out from the rest of its own chord. The mark comes next:
 // it is chosen by hand, so it wins over everything derived from the settings.
+// Then the drone note — which keeps its glow under the other two, so it can
+// still be told apart.
 const backgroundShades = computed(() => {
   if (props.inChord) {
     return ['bg-sky-200', 'hover:bg-sky-200', 'active:bg-sky-300']
   }
   if (props.marked) {
     return ['bg-emerald-200', 'hover:bg-emerald-300', 'active:bg-emerald-300']
+  }
+  if (props.drone) {
+    return ['bg-fuchsia-200', 'hover:bg-fuchsia-300', 'active:bg-fuchsia-300']
   }
   if (props.pianoMode) {
     return props.black
@@ -156,15 +176,27 @@ const borderClasses = computed(() => {
 })
 
 // The label must stay readable on a dark (black-key) background — unless the
-// chord highlight or the mark has replaced it with a light one.
+// chord highlight, the mark or the drone has replaced it with a light one.
 const labelClasses = computed(() =>
-  props.pianoMode && props.black && !props.inChord && !props.marked
+  props.pianoMode && props.black && !props.inChord && !props.marked && !props.drone
     ? 'text-neutral-300'
     : 'text-neutral-500',
 )
 
 // Transient highlight while the note is being played (a subtle zoom).
 const playingClasses = computed(() => (props.playing ? 'z-10 scale-110' : ''))
+
+// The drone glow spreads beyond the square: raised so that the neighbouring
+// squares do not cover it. Motionless when the system asks for less motion.
+const droneClasses = computed(() =>
+  props.drone
+    ? [
+        'z-[5]',
+        'shadow-[0_0_10px_3px_color-mix(in_oklab,var(--color-fuchsia-400)_60%,transparent)]',
+        'motion-safe:animate-drone-glow',
+      ].join(' ')
+    : '',
+)
 </script>
 
 <template>
@@ -173,9 +205,15 @@ const playingClasses = computed(() => (props.playing ? 'z-10 scale-110' : ''))
   <div class="@container flex min-w-0 flex-1 flex-col items-center gap-1">
     <div
       class="flex aspect-square w-full items-center justify-center rounded-md transition duration-150"
-      :class="[backgroundClasses, borderClasses, playingClasses, inert ? '' : 'cursor-pointer']"
+      :class="[
+        backgroundClasses,
+        borderClasses,
+        droneClasses,
+        playingClasses,
+        inert ? '' : 'cursor-pointer',
+      ]"
       @mousedown.prevent.stop="onMousedown"
-      @contextmenu.prevent="emit('secondary-press')"
+      @contextmenu.prevent="onContextmenu"
       @wheel.stop
       @mouseenter="emit('enter')"
       @mouseleave="emit('leave')"
