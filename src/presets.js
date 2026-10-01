@@ -7,6 +7,15 @@
 // the others take their value from the default preset — so that choosing a
 // preset always leads to the same screen, whatever was set before.
 //
+// A preset can also draw some settings at random, listed in `random` as
+// { name: [min, max] } (whole numbers, both included): each time the preset is
+// chosen, they take a new value in that range, and any value in it still
+// counts as the preset. Controls that only make sense with one preset (to
+// draw again, for instance) go in the "preset actions" area of App.vue.
+//
+// The settings listed in `free` are still set when the preset is chosen, but
+// can then be changed without leaving it.
+//
 // Settings and their values:
 //   firstNote        first square, as a semitone index (0 = Do1, 12 = Do2,
 //                    24 = Do3, 36 = Do4…), from 0 to 72
@@ -82,6 +91,21 @@ export const PRESETS = [
       labelMode: 'names',
     },
   },
+  {
+    key: 'guess-root',
+    label: 'Trouver la tonique',
+    settings: {
+      instrumentKey: 'piano',
+      scaleKey: 'ionian',
+      playMode: 'sustain',
+      scaleHighlightMode: 'all',
+      highlightOnes: false,
+    },
+    // The tonic to find by ear: any note from Do4 to Si4.
+    random: { numberStart: [36, 47] },
+    // Showing the 1s gives the answer away: it can be done to check.
+    free: ['highlightOnes'],
+  },
 ]
 
 export const DEFAULT_PRESET = PRESETS[0]
@@ -89,4 +113,13 @@ export const DEFAULT_PRESET = PRESETS[0]
 // Full settings of a preset: the default ones, overridden by its own.
 export function presetSettings(preset) {
   return { ...DEFAULT_PRESET.settings, ...preset.settings }
+}
+
+// A whole number drawn at random between min and max (both included). When
+// `current` is given and in range, it is left out, so that drawing again
+// always changes the value.
+export function drawRandom([min, max], current) {
+  const skip = current >= min && current <= max && max > min
+  const value = min + Math.floor(Math.random() * (max - min + (skip ? 0 : 1)))
+  return skip && value >= current ? value + 1 : value
 }

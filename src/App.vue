@@ -39,7 +39,7 @@ import {
   setGlideFrequency,
   stopGlide,
 } from './audio.js'
-import { PRESETS, DEFAULT_PRESET, presetSettings } from './presets.js'
+import { PRESETS, DEFAULT_PRESET, presetSettings, drawRandom } from './presets.js'
 
 // Every setting starts on the default preset (see presets.js).
 const defaults = DEFAULT_PRESET.settings
@@ -640,6 +640,7 @@ const LABEL_MODE_KEYS = { F1: 'numbers', F2: 'intervals', F3: 'names', F4: 'degr
 //   a        labels and scale highlight on every octave, or on a single one
 //            (both follow the labels, so that one press brings them in line)
 //   t        sustained notes, or short ones
+//   u        highlight every "1", or not
 // Left alone when Ctrl, Alt or Cmd is held, so as not to steal the browser's
 // own shortcuts. They work even when a dropdown has the focus — which it keeps
 // after an option is picked, a preset for instance — so the key is then kept
@@ -657,7 +658,38 @@ const LETTER_SHORTCUTS = {
   t: () => {
     playMode.value = playMode.value === 'sustain' ? 'short' : 'sustain'
   },
+  u: () => {
+    highlightOnes.value = !highlightOnes.value
+  },
 }
+
+// The shortcuts above, as listed at the bottom of the page: keep both in step.
+const SHORTCUT_HELP = [
+  ['F1 … F4', 'Libellés : numérotation, intervalles, nom des notes, degrés (même touche : aucun)'],
+  ['A', 'Libellés : mise en évidence sur toutes les octaves, ou une seule'],
+  ['U', 'Mettre en évidence les 1'],
+  ['D', 'Drone'],
+  ['T', 'Note tenue, ou courte'],
+  ['Échap', 'Effacer les notes marquées'],
+]
+
+// The mouse actions, listed next to the shortcuts: keep them in step with the
+// square events (Carre.vue) and the play area handlers.
+const MOUSE_HELP = [
+  ['Survol', 'Jouer la note (ou l’accord)'],
+  ['Clic', 'Marquer la note, ou la démarquer'],
+  ['Clic droit', 'En faire la note du 1'],
+  ['Ctrl + clic', 'Drone sur cette note (sur la note du drone : l’arrêter)'],
+  ['Clic à côté', 'Effacer les notes marquées'],
+  ['Glisser à côté', 'Faire défiler le clavier'],
+  ['Molette à côté', 'Zoomer'],
+]
+
+// Both references, shown side by side at the bottom of the page.
+const HELP = [
+  { title: 'Raccourcis clavier', items: SHORTCUT_HELP },
+  { title: 'Souris', items: MOUSE_HELP },
+]
 
 function onKeydown(e) {
   if (e.key === 'Escape') {
@@ -828,13 +860,19 @@ const SETTINGS = {
 // A preset file edited by hand can easily hold a typo: report the names that
 // match no setting, rather than silently ignoring them.
 for (const preset of PRESETS) {
-  for (const name of Object.keys(preset.settings)) {
+  const names = [
+    ...Object.keys(preset.settings),
+    ...Object.keys(preset.random ?? {}),
+    ...(preset.free ?? []),
+  ]
+  for (const name of names) {
     if (!(name in SETTINGS)) console.warn(`Preset "${preset.key}": unknown setting "${name}"`)
   }
 }
 
-// Apply a preset. The watchers triggered by the new values run on the next
-// flush, so the flag is only lowered once that flush is done.
+// Apply a preset, drawing its random settings. The watchers triggered by the
+// new values run on the next flush, so the flag is only lowered once that
+// flush is done.
 function applyPreset(key) {
   const preset = PRESETS.find((p) => p.key === key)
   if (!preset) return
@@ -842,6 +880,9 @@ function applyPreset(key) {
   for (const [name, value] of Object.entries(presetSettings(preset))) {
     if (!(name in SETTINGS)) continue
     SETTINGS[name].value = typeof value === 'object' ? { ...value } : value
+  }
+  for (const [name, range] of Object.entries(preset.random ?? {})) {
+    if (name in SETTINGS) SETTINGS[name].value = drawRandom(range)
   }
   nextTick(() => {
     applyingPreset = false
@@ -851,15 +892,26 @@ function applyPreset(key) {
 // The preset matching the current settings, or '' once any of them has been
 // changed by hand (the dropdown then reads "Personnalisé", and choosing the
 // preset again restores it). Values are compared as JSON, which also covers
-// the interval spellings object.
+// the interval spellings object; a random setting only has to be in its range,
+// and a free one can hold anything.
 const currentPreset = computed(() => {
   const matches = (preset) =>
-    Object.entries(presetSettings(preset)).every(
-      ([name, value]) =>
-        !(name in SETTINGS) || JSON.stringify(SETTINGS[name].value) === JSON.stringify(value),
-    )
+    Object.entries(presetSettings(preset)).every(([name, value]) => {
+      if (!(name in SETTINGS) || preset.free?.includes(name)) return true
+      const current = SETTINGS[name].value
+      const range = preset.random?.[name]
+      if (range) return Number.isInteger(current) && current >= range[0] && current <= range[1]
+      return JSON.stringify(current) === JSON.stringify(value)
+    })
   return PRESETS.find(matches)?.key ?? ''
 })
+
+// Draw a new value for one of the current preset's random settings, other
+// than the one it has.
+function drawAgain(name) {
+  const range = PRESETS.find((p) => p.key === currentPreset.value)?.random?.[name]
+  if (range) SETTINGS[name].value = drawRandom(range, SETTINGS[name].value)
+}
 
 // Whether the detailed settings are shown below the main ones.
 const showAllSettings = ref(false)
@@ -1044,6 +1096,18 @@ const showAllSettings = ref(false)
           @click="showAllSettings = !showAllSettings"
         >
           {{ showAllSettings ? 'Masquer les réglages ▴' : 'Tous les réglages ▾' }}
+        </button>
+      </div>
+
+      <!-- Preset actions: controls that only make sense with the current
+           preset, one block per preset that has some. -->
+      <div v-if="currentPreset === 'guess-root'" class="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          class="cursor-pointer rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"
+          @click="drawAgain('numberStart')"
+        >
+          Changer la note du 1
         </button>
       </div>
 
@@ -1574,6 +1638,30 @@ const showAllSettings = ref(false)
             </optgroup>
           </select>
         </div>
+        </div>
+      </div>
+
+      <!-- Keyboard shortcuts and mouse actions reference (see HELP), shown
+           with the detailed settings -->
+      <div
+        v-if="showAllSettings"
+        class="grid grid-cols-1 items-start gap-x-10 gap-y-6 border-t border-neutral-100 pt-6 md:grid-cols-2"
+      >
+        <div v-for="section in HELP" :key="section.title" class="flex flex-col gap-3">
+          <span class="text-sm font-medium tracking-wide text-neutral-600">
+            {{ section.title }}
+          </span>
+          <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm text-neutral-500">
+            <template v-for="[keys, action] in section.items" :key="keys">
+              <dt>
+                <kbd
+                  class="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-sans text-xs text-neutral-600"
+                  >{{ keys }}</kbd
+                >
+              </dt>
+              <dd>{{ action }}</dd>
+            </template>
+          </dl>
         </div>
       </div>
       </div>
