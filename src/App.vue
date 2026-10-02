@@ -87,9 +87,12 @@ const numberStart = ref(defaults.numberStart)
 // Continuous background drone.
 const droneOn = ref(defaults.droneOn)
 
-// Drone note, as an absolute semitone index (0 = Do1), independent of the
-// "note du 1".
+// Drone note, as an absolute semitone index (0 = Do1). It follows the "note
+// du 1" (presets included), but can then be changed on its own.
 const droneNote = ref(defaults.droneNote)
+watch(numberStart, (n) => {
+  droneNote.value = n
+})
 
 // Drone volume on the displayed 0..100 scale, which maps to 0..50% of the
 // actual level (so the displayed 100 is half the level of the played notes).
@@ -185,6 +188,11 @@ const scaleHighlightMode = ref(defaults.scaleHighlightMode)
 // When a scale is selected, hide the labels of squares that are not
 // highlighted (i.e. only scale notes keep their inner label).
 const hideLabelsOutOfScale = ref(defaults.hideLabelsOutOfScale)
+
+// When a scale is selected, leave out the squares that are not highlighted
+// altogether: the others close up and share the whole row. The glissando band
+// could no longer line up with them, so it is hidden meanwhile.
+const hideNotesOutOfScale = ref(defaults.hideNotesOutOfScale)
 
 // The currently selected scale object, or null when none is selected.
 const selectedScale = computed(() => SCALES.find((s) => s.key === scaleKey.value) || null)
@@ -319,8 +327,20 @@ function isAudible(semitone) {
   return inScale(semitone)
 }
 
-// 12 squares per octave.
-const carres = computed(() => Array.from({ length: octaves.value * 12 }, (_, i) => i))
+// Number of semitones in view: 12 per octave. The zoom and the drag count in
+// semitones, whether or not some squares are left out.
+const semitoneCount = computed(() => octaves.value * 12)
+
+// Whether the squares out of the selection are left out (see
+// hideNotesOutOfScale).
+const hidingNotes = computed(() => !!selectedScale.value && hideNotesOutOfScale.value)
+
+// The squares displayed, as offsets from the first note: one per semitone,
+// or only the highlighted ones when the others are left out.
+const carres = computed(() => {
+  const all = Array.from({ length: semitoneCount.value }, (_, i) => i)
+  return hidingNotes.value ? all.filter((i) => isHighlighted(firstNote.value + i)) : all
+})
 
 // Gap between squares in pixels (Tailwind gap-1.5 = 0.375rem = 6px). Anything
 // that has to line up with the squares — the glissando band, the chord
@@ -330,7 +350,8 @@ const SQUARE_GAP = 6
 // Width of one square as a CSS expression, given a row that fills the whole
 // area: the squares share it evenly, minus the gaps between them.
 const squareWidthCss = computed(() => {
-  const count = carres.value.length
+  // At least one, should no square be left (a single octave out of view).
+  const count = Math.max(1, carres.value.length)
   return `((100% - ${(count - 1) * SQUARE_GAP}px) / ${count})`
 })
 
@@ -602,7 +623,7 @@ function onPlayAreaWheel(e) {
   const steps = Math.trunc(wheelAccumulator / WHEEL_STEP)
   if (steps === 0) return
   wheelAccumulator -= steps * WHEEL_STEP
-  const oldCount = carres.value.length
+  const oldCount = semitoneCount.value
   octaves.value = Math.max(1, Math.min(10, octaves.value + steps))
   anchorZoom(e.clientX, oldCount, octaves.value * 12)
 }
@@ -613,7 +634,9 @@ function onPlayAreaWheel(e) {
 // of the row width tells how many squares lie to its left; the first note is
 // shifted so that, with the new count, the same note sits at that same
 // fraction. Rounded to a whole semitone and clamped to the first note's
-// range, so near the ends of the keyboard the anchor can drift a little.
+// range, so near the ends of the keyboard the anchor can drift a little — and
+// a bit more with the notes out of the selection left out, the remaining
+// squares not being one per semitone.
 function anchorZoom(clientX, oldCount, newCount) {
   if (!notesRow.value || oldCount === newCount) return
   const rect = notesRow.value.getBoundingClientRect()
@@ -641,6 +664,7 @@ const LABEL_MODE_KEYS = { F1: 'numbers', F2: 'intervals', F3: 'names', F4: 'degr
 //            (both follow the labels, so that one press brings them in line)
 //   t        sustained notes, or short ones
 //   u        highlight every "1", or not
+//   g        show or hide the glissando band
 // Left alone when Ctrl, Alt or Cmd is held, so as not to steal the browser's
 // own shortcuts. They work even when a dropdown has the focus — which it keeps
 // after an option is picked, a preset for instance — so the key is then kept
@@ -661,6 +685,9 @@ const LETTER_SHORTCUTS = {
   u: () => {
     highlightOnes.value = !highlightOnes.value
   },
+  g: () => {
+    showGlide.value = !showGlide.value
+  },
 }
 
 // The shortcuts above, as listed at the bottom of the page: keep both in step.
@@ -670,6 +697,7 @@ const SHORTCUT_HELP = [
   ['U', 'Mettre en évidence les 1'],
   ['D', 'Drone'],
   ['T', 'Note tenue, ou courte'],
+  ['G', 'Glissando'],
   ['Échap', 'Effacer les notes marquées'],
 ]
 
@@ -738,8 +766,9 @@ function onPanMove(e) {
   const dx = e.clientX - panStart.x
   if (!panning.value && Math.abs(dx) < PAN_THRESHOLD) return
   panning.value = true
-  // Every square and its gap take an equal share of the row.
-  const slot = notesRow.value.getBoundingClientRect().width / carres.value.length
+  // Every semitone takes an equal share of the row (on average, when the notes
+  // out of the selection are left out).
+  const slot = notesRow.value.getBoundingClientRect().width / semitoneCount.value
   const first = Math.round(panStart.firstNote - dx / slot)
   firstNote.value = Math.max(MIN_NOTE, Math.min(MAX_NOTE, first))
 }
@@ -850,6 +879,7 @@ const SETTINGS = {
   chordSize,
   scaleHighlightMode,
   hideLabelsOutOfScale,
+  hideNotesOutOfScale,
   showDegrees,
   playMode,
   instrumentKey,
@@ -906,11 +936,12 @@ const currentPreset = computed(() => {
   return PRESETS.find(matches)?.key ?? ''
 })
 
-// Draw a new value for one of the current preset's random settings, other
-// than the one it has.
-function drawAgain(name) {
-  const range = PRESETS.find((p) => p.key === currentPreset.value)?.random?.[name]
-  if (range) SETTINGS[name].value = drawRandom(range, SETTINGS[name].value)
+// Draw another "note du 1", other than the one it is: in the range of the
+// current preset when it draws it at random, otherwise from Do4 to Si4.
+function changeNumberStart() {
+  const preset = PRESETS.find((p) => p.key === currentPreset.value)
+  const range = preset?.random?.numberStart ?? [36, 47]
+  numberStart.value = drawRandom(range, numberStart.value)
 }
 
 // Whether the detailed settings are shown below the main ones.
@@ -945,9 +976,10 @@ const showAllSettings = ref(false)
       @wheel.prevent="onPlayAreaWheel"
     >
       <div class="flex w-full flex-col gap-3">
-        <!-- Continuous glissando band, aligned with the squares row -->
+        <!-- Continuous glissando band, aligned with the squares row (so not
+             there while some squares are left out) -->
         <div
-          v-if="showGlide"
+          v-if="showGlide && !hidingNotes"
           ref="glideTrack"
           class="relative h-40 w-full cursor-ew-resize touch-none select-none overflow-hidden rounded-md border border-neutral-200 bg-gradient-to-r from-neutral-50 to-neutral-200"
           @pointerenter="onGlideEnter"
@@ -1105,7 +1137,7 @@ const showAllSettings = ref(false)
         <button
           type="button"
           class="cursor-pointer rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"
-          @click="drawAgain('numberStart')"
+          @click="changeNumberStart"
         >
           Changer la note du 1
         </button>
@@ -1187,6 +1219,15 @@ const showAllSettings = ref(false)
             Mettre en évidence les 1
           </span>
         </label>
+
+        <!-- Draw another "note du 1", also among the preset actions -->
+        <button
+          type="button"
+          class="cursor-pointer self-start rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"
+          @click="changeNumberStart"
+        >
+          Changer la note du 1
+        </button>
 
         <!-- Labels -->
         <div class="flex flex-col gap-3">
@@ -1561,6 +1602,15 @@ const showAllSettings = ref(false)
                 class="size-4 accent-neutral-800"
               />
               <span class="text-sm text-neutral-600">Masquer les libellés hors sélection</span>
+            </label>
+
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="hideNotesOutOfScale"
+                type="checkbox"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Masquer les notes hors sélection</span>
             </label>
 
             <!-- Degrees only apply to a scale, not to an interval or a chord -->

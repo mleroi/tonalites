@@ -34,13 +34,16 @@
 //   showFrequencies  true / false
 //   pianoMode        true / false
 //   droneOn          true / false
-//   droneNote        drone note, as a semitone index, from 0 to 96
+//   droneNote        drone note, as a semitone index, from 0 to 96; it follows
+//                    numberStart, so give it the same value (or make it free
+//                    when numberStart is random)
 //   droneVolume      from 0 to 100
 //   scaleKey         '' (none) or a key of SCALES in notes.js ('ionian'…)
 //   scaleAudioMode   'scale-only' | 'all' | 'chords'
 //   chordSize        number of notes per chord: 3, 4 or 5
 //   scaleHighlightMode    'single' | 'all'
 //   hideLabelsOutOfScale  true / false
+//   hideNotesOutOfScale   true / false
 //   showDegrees      true / false
 //   playMode         'short' | 'sustain'
 //   instrumentKey    '' (synth) or a key of INSTRUMENTS in instruments.js
@@ -74,6 +77,7 @@ export const PRESETS = [
       chordSize: 3,
       scaleHighlightMode: 'single',
       hideLabelsOutOfScale: true,
+      hideNotesOutOfScale: false,
       showDegrees: false,
       playMode: 'short',
       instrumentKey: '',
@@ -99,12 +103,15 @@ export const PRESETS = [
       scaleKey: 'ionian',
       playMode: 'sustain',
       scaleHighlightMode: 'all',
+      hideNotesOutOfScale: true,
+      showGlide: false,
       highlightOnes: false,
     },
     // The tonic to find by ear: any note from Do4 to Si4.
     random: { numberStart: [36, 47] },
-    // Showing the 1s gives the answer away: it can be done to check.
-    free: ['highlightOnes'],
+    // Showing the 1s or playing the drone (on the tonic, the drawn "note du
+    // 1") gives the answer away: it can be done to check.
+    free: ['highlightOnes', 'droneOn', 'droneNote'],
   },
 ]
 
