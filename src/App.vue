@@ -1133,7 +1133,25 @@ const showAllSettings = ref(false)
 
       <!-- Preset actions: controls that only make sense with the current
            preset, one block per preset that has some. -->
-      <div v-if="currentPreset === 'guess-root'" class="flex flex-wrap items-center gap-3">
+      <div v-if="currentPreset === 'guess-root-major'" class="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          class="cursor-pointer rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"
+          @click="changeNumberStart"
+        >
+          Changer la note du 1
+        </button>
+      </div>
+      <div v-if="currentPreset === 'guess-root-minor-aeolian'" class="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          class="cursor-pointer rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"
+          @click="changeNumberStart"
+        >
+          Changer la note du 1
+        </button>
+      </div>
+      <div v-if="currentPreset === 'guess-root-minor-harmonic'" class="flex flex-wrap items-center gap-3">
         <button
           type="button"
           class="cursor-pointer rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"

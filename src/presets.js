@@ -96,11 +96,47 @@ export const PRESETS = [
     },
   },
   {
-    key: 'guess-root',
-    label: 'Trouver la tonique',
+    key: 'guess-root-major',
+    label: 'Trouver la tonique (Gamme majeure)',
     settings: {
       instrumentKey: 'piano',
       scaleKey: 'ionian',
+      playMode: 'sustain',
+      scaleHighlightMode: 'all',
+      hideNotesOutOfScale: true,
+      showGlide: false,
+      highlightOnes: false,
+    },
+    // The tonic to find by ear: any note from Do4 to Si4.
+    random: { numberStart: [36, 47] },
+    // Showing the 1s or playing the drone (on the tonic, the drawn "note du
+    // 1") gives the answer away: it can be done to check.
+    free: ['highlightOnes', 'droneOn', 'droneNote'],
+  },
+  {
+    key: 'guess-root-minor-aeolian',
+    label: 'Trouver la tonique (Gamme mineure)',
+    settings: {
+      instrumentKey: 'piano',
+      scaleKey: 'aeolian',
+      playMode: 'sustain',
+      scaleHighlightMode: 'all',
+      hideNotesOutOfScale: true,
+      showGlide: false,
+      highlightOnes: false,
+    },
+    // The tonic to find by ear: any note from Do4 to Si4.
+    random: { numberStart: [36, 47] },
+    // Showing the 1s or playing the drone (on the tonic, the drawn "note du
+    // 1") gives the answer away: it can be done to check.
+    free: ['highlightOnes', 'droneOn', 'droneNote'],
+  },
+  {
+    key: 'guess-root-minor-harmonic',
+    label: 'Trouver la tonique (Gamme mineure harmonique)',
+    settings: {
+      instrumentKey: 'piano',
+      scaleKey: 'min-harmonic',
       playMode: 'sustain',
       scaleHighlightMode: 'all',
       hideNotesOutOfScale: true,
