@@ -654,12 +654,24 @@ function clearMarks() {
 // "Aucun" (reached by pressing again the key of the current mode).
 const LABEL_MODE_KEYS = { F1: 'numbers', F2: 'intervals', F3: 'names', F4: 'degrees' }
 
+// What is written below the squares, toggled with F5..F8 in the order of the
+// checkboxes.
+const BELOW_SQUARE_KEYS = {
+  F5: showNotes,
+  F6: showSimpleNotes,
+  F7: showFrequencies,
+  F8: showDegrees,
+}
+
 // Keyboard shortcuts:
 //   Escape   clear the marks
 //   F1..F4   label mode, from "Numérotation" to "Degrés"; pressing again the
 //            key of the mode already on goes back to "Aucun". Like its radio
 //            button, "Degrés" is only there with a seven-note scale
-//   d        drone on/off
+//   F5..F8   below the squares: notes, simple notes, frequencies, degrees
+//            on/off. The degrees only with a seven-note scale, as above; F5
+//            no longer reloads the page (Ctrl + F5 still does)
+//   d       drone on/off
 //   a        labels and scale highlight on every octave, or on a single one
 //            (both follow the labels, so that one press brings them in line)
 //   t        sustained notes, or short ones
@@ -693,6 +705,7 @@ const LETTER_SHORTCUTS = {
 // The shortcuts above, as listed at the bottom of the page: keep both in step.
 const SHORTCUT_HELP = [
   ['F1 … F4', 'Libellés : numérotation, intervalles, nom des notes, degrés (même touche : aucun)'],
+  ['F5 … F8', 'Sous les cases : notes, notes simples, fréquences, degrés'],
   ['A', 'Libellés : mise en évidence sur toutes les octaves, ou une seule'],
   ['U', 'Mettre en évidence les 1'],
   ['D', 'Drone'],
@@ -726,14 +739,19 @@ function onKeydown(e) {
   }
   if (e.ctrlKey || e.altKey || e.metaKey) return
   const mode = LABEL_MODE_KEYS[e.key]
+  const below = BELOW_SQUARE_KEYS[e.key]
   const letter = LETTER_SHORTCUTS[e.key.toLowerCase()]
-  if (!mode && !letter) return
-  // Also keeps F1 from opening the help in some browsers.
+  if (!mode && !below && !letter) return
+  // Also keeps F1 from opening the help in some browsers, and F5 from
+  // reloading the page.
   e.preventDefault()
   if (e.repeat) return
   if (mode) {
     if (mode === 'degrees' && !sevenNoteScale.value) return
     labelMode.value = labelMode.value === mode ? 'none' : mode
+  } else if (below) {
+    if (below === showDegrees && !sevenNoteScale.value) return
+    below.value = !below.value
   } else {
     letter()
   }
