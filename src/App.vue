@@ -39,7 +39,7 @@ import {
   setGlideFrequency,
   stopGlide,
 } from './audio.js'
-import { PRESETS, DEFAULT_PRESET, presetSettings, drawRandom } from './presets.js'
+import { PRESETS, DEFAULT_PRESET, VIEW_SETTINGS, presetSettings, drawRandom } from './presets.js'
 
 // Every setting starts on the default preset (see presets.js).
 const defaults = DEFAULT_PRESET.settings
@@ -941,11 +941,12 @@ function applyPreset(key) {
 // changed by hand (the dropdown then reads "Personnalisé", and choosing the
 // preset again restores it). Values are compared as JSON, which also covers
 // the interval spellings object; a random setting only has to be in its range,
-// and a free one can hold anything.
+// and a free one (the view included) can hold anything.
 const currentPreset = computed(() => {
   const matches = (preset) =>
     Object.entries(presetSettings(preset)).every(([name, value]) => {
-      if (!(name in SETTINGS) || preset.free?.includes(name)) return true
+      if (!(name in SETTINGS) || VIEW_SETTINGS.includes(name)) return true
+      if (preset.free?.includes(name)) return true
       const current = SETTINGS[name].value
       const range = preset.random?.[name]
       if (range) return Number.isInteger(current) && current >= range[0] && current <= range[1]
@@ -960,6 +961,29 @@ function changeNumberStart() {
   const preset = PRESETS.find((p) => p.key === currentPreset.value)
   const range = preset?.random?.numberStart ?? [36, 47]
   numberStart.value = drawRandom(range, numberStart.value)
+}
+
+// The answer of the "Trouver la tonique" exercise: the 1s highlighted and the
+// drone playing the "note du 1". Shown and hidden by the "Réponse" button.
+const answerShown = computed(
+  () => highlightOnes.value && droneOn.value && droneNote.value === numberStart.value,
+)
+
+function setAnswerShown(shown) {
+  highlightOnes.value = shown
+  droneOn.value = shown
+  // Brought back to the "note du 1" in case it was moved.
+  if (shown) droneNote.value = numberStart.value
+}
+
+function toggleAnswer() {
+  setAnswerShown(!answerShown.value)
+}
+
+// Next question of the exercise: another tonic, with the answer hidden.
+function nextQuestion() {
+  setAnswerShown(false)
+  changeNumberStart()
 }
 
 // Whether the detailed settings are shown below the main ones.
@@ -1151,31 +1175,36 @@ const showAllSettings = ref(false)
 
       <!-- Preset actions: controls that only make sense with the current
            preset, one block per preset that has some. -->
-      <div v-if="currentPreset === 'guess-root-major'" class="flex flex-wrap items-center gap-3">
+      <div v-if="currentPreset === 'guess-root'" class="flex flex-wrap items-center gap-3">
+        <!-- The scale, free in this preset: changing it keeps the preset.
+             Same list as in the detailed settings. -->
+        <select
+          v-model="scaleKey"
+          aria-label="Gammes / Intervalles / Accords"
+          class="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
+        >
+          <option value="">Aucun</option>
+          <optgroup v-for="g in SCALE_TYPES" :key="g.type" :label="g.label">
+            <option v-for="s in scalesOfType(g.type)" :key="s.key" :value="s.key">
+              {{ s.label }}
+            </option>
+          </optgroup>
+        </select>
         <button
           type="button"
           class="cursor-pointer rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"
-          @click="changeNumberStart"
+          @click="nextQuestion"
         >
           Changer la note du 1
         </button>
-      </div>
-      <div v-if="currentPreset === 'guess-root-minor-aeolian'" class="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          class="cursor-pointer rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"
-          @click="changeNumberStart"
+          class="cursor-pointer rounded-md border border-neutral-200 px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"
+          :class="answerShown ? 'bg-neutral-100' : 'bg-white'"
+          :aria-pressed="answerShown"
+          @click="toggleAnswer"
         >
-          Changer la note du 1
-        </button>
-      </div>
-      <div v-if="currentPreset === 'guess-root-minor-harmonic'" class="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          class="cursor-pointer rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"
-          @click="changeNumberStart"
-        >
-          Changer la note du 1
+          Réponse
         </button>
       </div>
 

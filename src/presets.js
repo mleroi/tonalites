@@ -14,7 +14,8 @@
 // draw again, for instance) go in the "preset actions" area of App.vue.
 //
 // The settings listed in `free` are still set when the preset is chosen, but
-// can then be changed without leaving it.
+// can then be changed without leaving it. The VIEW_SETTINGS below are free in
+// every preset.
 //
 // Settings and their values:
 //   firstNote        first square, as a semitone index (0 = Do1, 12 = Do2,
@@ -96,8 +97,8 @@ export const PRESETS = [
     },
   },
   {
-    key: 'guess-root-major',
-    label: 'Trouver la tonique (Gamme majeure)',
+    key: 'guess-root',
+    label: 'Trouver la tonique',
     settings: {
       instrumentKey: 'piano',
       scaleKey: 'ionian',
@@ -110,48 +111,17 @@ export const PRESETS = [
     // The tonic to find by ear: any note from Do4 to Si4.
     random: { numberStart: [36, 47] },
     // Showing the 1s or playing the drone (on the tonic, the drawn "note du
-    // 1") gives the answer away: it can be done to check.
-    free: ['highlightOnes', 'droneOn', 'droneNote'],
-  },
-  {
-    key: 'guess-root-minor-aeolian',
-    label: 'Trouver la tonique (Gamme mineure)',
-    settings: {
-      instrumentKey: 'piano',
-      scaleKey: 'aeolian',
-      playMode: 'sustain',
-      scaleHighlightMode: 'all',
-      hideNotesOutOfScale: true,
-      showGlide: false,
-      highlightOnes: false,
-    },
-    // The tonic to find by ear: any note from Do4 to Si4.
-    random: { numberStart: [36, 47] },
-    // Showing the 1s or playing the drone (on the tonic, the drawn "note du
-    // 1") gives the answer away: it can be done to check.
-    free: ['highlightOnes', 'droneOn', 'droneNote'],
-  },
-  {
-    key: 'guess-root-minor-harmonic',
-    label: 'Trouver la tonique (Gamme mineure harmonique)',
-    settings: {
-      instrumentKey: 'piano',
-      scaleKey: 'min-harmonic',
-      playMode: 'sustain',
-      scaleHighlightMode: 'all',
-      hideNotesOutOfScale: true,
-      showGlide: false,
-      highlightOnes: false,
-    },
-    // The tonic to find by ear: any note from Do4 to Si4.
-    random: { numberStart: [36, 47] },
-    // Showing the 1s or playing the drone (on the tonic, the drawn "note du
-    // 1") gives the answer away: it can be done to check.
-    free: ['highlightOnes', 'droneOn', 'droneNote'],
+    // 1") gives the answer away: it can be done to check. The scale the tonic
+    // is heard in can be picked among the preset actions.
+    free: ['highlightOnes', 'droneOn', 'droneNote', 'scaleKey'],
   },
 ]
 
 export const DEFAULT_PRESET = PRESETS[0]
+
+// The part of the keyboard in view, moved by the zoom and the drag: a preset
+// sets them, but moving around never leaves it.
+export const VIEW_SETTINGS = ['firstNote', 'octaves']
 
 // Full settings of a preset: the default ones, overridden by its own.
 export function presetSettings(preset) {
