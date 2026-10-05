@@ -15,7 +15,8 @@
 //
 // The settings listed in `free` are still set when the preset is chosen, but
 // can then be changed without leaving it. The VIEW_SETTINGS below are free in
-// every preset.
+// every preset. With `free: 'all'`, every setting is: such a preset matches
+// any settings, so it is only left by choosing another one.
 //
 // Settings and their values:
 //   firstNote        first square, as a semitone index (0 = Do1, 12 = Do2,
@@ -114,6 +115,27 @@ export const PRESETS = [
     // 1") gives the answer away: it can be done to check. The scale the tonic
     // is heard in can be picked among the preset actions.
     free: ['highlightOnes', 'droneOn', 'droneNote', 'scaleKey'],
+  },
+  {
+    key: 'melodies',
+    label: 'Mélodies',
+    settings: {
+      instrumentKey: 'piano',
+      playMode: 'sustain',
+      labelMode: 'intervals',
+      // Melodies go above and below the "note du 1": number every octave.
+      labelScope: 'all',
+      showGlide: false,
+      scaleHighlightMode: 'all',
+      // Every note stays playable alongside a melody, which may well step out
+      // of the chosen scale.
+      scaleAudioMode: 'all',
+    },
+    // A melody is meant to be heard in any key (from the "note du 1") and
+    // under any display, so everything can be changed without leaving the
+    // preset. The melody itself is chosen among the preset actions, and is
+    // not a setting.
+    free: 'all',
   },
 ]
 

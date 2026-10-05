@@ -120,6 +120,86 @@ export function releaseAllNotes() {
   samplers.forEach(({ sampler }) => sampler.releaseAll())
 }
 
+// The melody being played (see playMelody), or null.
+let melodyPart = null
+
+// Melody tempo, as a rate of the written one (1 = as written, 2 = twice as
+// fast). Note times are in seconds at the written tempo; they are placed on
+// the Transport in ticks at BASE_BPM, so that changing the Transport's tempo
+// speeds up or slows down whatever is left to play, even mid-melody.
+const BASE_BPM = 120
+let melodyRate = 1
+
+// Converts a time in seconds at the written tempo into Transport ticks.
+function melodyTicks(seconds) {
+  return `${Math.round((seconds * BASE_BPM * Tone.getTransport().PPQ) / 60)}i`
+}
+
+// Sets the melody tempo (see melodyRate), live if a melody is playing.
+export function setMelodyTempo(rate) {
+  melodyRate = rate
+  Tone.getTransport().bpm.value = BASE_BPM * rate
+}
+
+// Tears down the melody playback: stops the Transport, drops the notes still
+// to come and the pending highlight callbacks. Notes already sounding are left
+// to ring out.
+function disposeMelody() {
+  if (!melodyPart) return
+  const transport = Tone.getTransport()
+  transport.stop()
+  transport.cancel(0)
+  melodyPart.dispose()
+  melodyPart = null
+  Tone.getDraw().cancel(0)
+}
+
+// Plays a melody (notes as loaded by melodies.js) on the current instrument,
+// replacing any melody already playing. The source is looked up for each note,
+// so changing the instrument mid-melody carries on with the new one.
+// `transpose` maps each written semitone to the one heard; it is also called
+// for each note, so a change of transposition applies from the next note on.
+// `onNoteStart` / `onNoteEnd` are called in sync with the sound, with the
+// semitone heard, to highlight the notes; `onEnd` once the last note has ended.
+export async function playMelody(notes, { transpose, onNoteStart, onNoteEnd, onEnd } = {}) {
+  await startAudio()
+  disposeMelody()
+  const transport = Tone.getTransport()
+  const draw = Tone.getDraw()
+  transport.bpm.value = BASE_BPM * melodyRate
+  const events = notes.map((n) => ({ ...n, time: melodyTicks(n.time) }))
+  melodyPart = new Tone.Part((time, note) => {
+    const semitone = transpose ? transpose(note.semitone) : note.semitone
+    // The length follows the tempo the note starts at.
+    const duration = note.duration / melodyRate
+    noteSource().source.triggerAttackRelease(
+      semitoneToFrequency(semitone),
+      duration,
+      time,
+      note.velocity,
+    )
+    if (onNoteStart) draw.schedule(() => onNoteStart(semitone), time)
+    if (onNoteEnd) draw.schedule(() => onNoteEnd(semitone), time + duration)
+  }, events).start(0)
+  const end = notes.reduce((last, n) => Math.max(last, n.time + n.duration), 0)
+  transport.scheduleOnce((time) => {
+    draw.schedule(() => {
+      disposeMelody()
+      if (onEnd) onEnd()
+    }, time)
+  }, melodyTicks(end))
+  transport.position = 0
+  // A short delay, so the first notes are not cut by the scheduling.
+  transport.start('+0.05')
+}
+
+// Stops the melody playback, silencing the notes still sounding.
+export function stopMelody() {
+  if (!melodyPart) return
+  disposeMelody()
+  releaseAllNotes()
+}
+
 // A separate, sustained synth for the drone, kept quieter so hovered notes
 // are heard on top of it.
 let droneSynth = null

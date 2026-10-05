@@ -38,7 +38,11 @@ import {
   startGlide,
   setGlideFrequency,
   stopGlide,
+  playMelody,
+  stopMelody,
+  setMelodyTempo,
 } from './audio.js'
+import { loadMelodies, groupMelodies } from './melodies.js'
 import { PRESETS, DEFAULT_PRESET, VIEW_SETTINGS, presetSettings, drawRandom } from './presets.js'
 
 // Every setting starts on the default preset (see presets.js).
@@ -306,6 +310,81 @@ function playSelectionDescending() {
   playSequence([...selectionNotes.value].reverse())
 }
 
+// Melodies from the MIDI files in public/midi (see melodies.js), loaded once
+// at startup, and the one selected ('' = none).
+const melodies = ref([])
+loadMelodies().then((list) => (melodies.value = list))
+const melodyKey = ref('')
+// The melodies by group (their subfolder), for the dropdowns.
+const melodyGroups = computed(() => groupMelodies(melodies.value))
+const selectedMelody = computed(() => melodies.value.find((m) => m.key === melodyKey.value) || null)
+
+// Whether the selected melody is playing.
+const melodyPlaying = ref(false)
+
+// When enabled, the squares of the melody's notes light up as they sound.
+const highlightMelody = ref(true)
+
+// Melody tempo, as a percentage of the one written in the file. It applies
+// live, even mid-melody.
+const melodyTempo = ref(100)
+watch(melodyTempo, (percent) => setMelodyTempo(percent / 100), { immediate: true })
+
+// Melody notes currently sounding, each with how many times it is: the end of
+// a note and the start of the same note right after it fall on the same
+// instant, in either order, so a plain set would lose the second one.
+const melodyNotes = ref(new Map())
+
+function melodyNoteStart(semitone) {
+  melodyNotes.value.set(semitone, (melodyNotes.value.get(semitone) || 0) + 1)
+}
+
+function melodyNoteEnd(semitone) {
+  const count = (melodyNotes.value.get(semitone) || 0) - 1
+  if (count > 0) melodyNotes.value.set(semitone, count)
+  else melodyNotes.value.delete(semitone)
+}
+
+// Stops the melody, if playing, and clears its highlight.
+function stopMelodyPlayback() {
+  stopMelody()
+  melodyPlaying.value = false
+  melodyNotes.value.clear()
+}
+
+// Plays the selected melody from the start, or stops it when playing.
+function toggleMelody() {
+  if (melodyPlaying.value) {
+    stopMelodyPlayback()
+    return
+  }
+  const melody = selectedMelody.value
+  if (!melody) return
+  melodyNotes.value.clear()
+  melodyPlaying.value = true
+  playMelody(melody.notes, {
+    // The melody's tonic lands on the "note du 1", following it if it moves
+    // during playback. A melody whose tonic is unknown is played as written.
+    transpose: (semitone) =>
+      melody.tonic === null ? semitone : semitone + numberStart.value - melody.tonic,
+    onNoteStart: melodyNoteStart,
+    onNoteEnd: melodyNoteEnd,
+    onEnd: () => {
+      melodyPlaying.value = false
+      melodyNotes.value.clear()
+    },
+  })
+}
+
+watch(melodyKey, stopMelodyPlayback)
+onUnmounted(stopMelodyPlayback)
+
+// True if a square should light up as being played: by a click, hover or
+// selection playback, or by the melody when it is highlighted.
+function isPlaying(semitone) {
+  return playingNotes.value.has(semitone) || (highlightMelody.value && melodyNotes.value.has(semitone))
+}
+
 // True if the note belongs to the selected scale (false when no scale).
 function inScale(semitone) {
   if (!selectedScale.value) return false
@@ -413,6 +492,13 @@ const chordSize = ref(defaults.chordSize)
 // Guarded by the scale type, so a selection left on 'chords' while switching
 // to a pentatonic or a chord falls back to playing single notes.
 const chordMode = computed(() => scaleAudioMode.value === 'chords' && sevenNoteScale.value)
+
+// Turns "Entendre les accords" on or off (the "Mode accord" button of the
+// "Mélodies" preset). Off, it goes back to "Entendre toutes les notes", that
+// preset's listening mode.
+function toggleChordMode() {
+  scaleAudioMode.value = scaleAudioMode.value === 'chords' ? 'all' : 'chords'
+}
 
 // Name of the chord currently under the pointer, shown below the squares.
 const hoveredChord = ref('')
@@ -911,12 +997,15 @@ for (const preset of PRESETS) {
   const names = [
     ...Object.keys(preset.settings),
     ...Object.keys(preset.random ?? {}),
-    ...(preset.free ?? []),
+    ...(Array.isArray(preset.free) ? preset.free : []),
   ]
   for (const name of names) {
     if (!(name in SETTINGS)) console.warn(`Preset "${preset.key}": unknown setting "${name}"`)
   }
 }
+
+// The preset last chosen (see currentPreset).
+const appliedPreset = ref(DEFAULT_PRESET.key)
 
 // Apply a preset, drawing its random settings. The watchers triggered by the
 // new values run on the next flush, so the flag is only lowered once that
@@ -924,6 +1013,7 @@ for (const preset of PRESETS) {
 function applyPreset(key) {
   const preset = PRESETS.find((p) => p.key === key)
   if (!preset) return
+  appliedPreset.value = key
   applyingPreset = true
   for (const [name, value] of Object.entries(presetSettings(preset))) {
     if (!(name in SETTINGS)) continue
@@ -941,10 +1031,14 @@ function applyPreset(key) {
 // changed by hand (the dropdown then reads "Personnalisé", and choosing the
 // preset again restores it). Values are compared as JSON, which also covers
 // the interval spellings object; a random setting only has to be in its range,
-// and a free one (the view included) can hold anything.
+// and a free one (the view included) can hold anything. A preset whose every
+// setting is free would match anything, so it only does as the last chosen.
+// The last chosen preset comes first, so that it is kept as long as it
+// matches, even when the settings also match another one.
 const currentPreset = computed(() => {
-  const matches = (preset) =>
-    Object.entries(presetSettings(preset)).every(([name, value]) => {
+  const matches = (preset) => {
+    if (preset.free === 'all') return preset.key === appliedPreset.value
+    return Object.entries(presetSettings(preset)).every(([name, value]) => {
       if (!(name in SETTINGS) || VIEW_SETTINGS.includes(name)) return true
       if (preset.free?.includes(name)) return true
       const current = SETTINGS[name].value
@@ -952,6 +1046,9 @@ const currentPreset = computed(() => {
       if (range) return Number.isInteger(current) && current >= range[0] && current <= range[1]
       return JSON.stringify(current) === JSON.stringify(value)
     })
+  }
+  const applied = PRESETS.find((p) => p.key === appliedPreset.value)
+  if (applied && matches(applied)) return applied.key
   return PRESETS.find(matches)?.key ?? ''
 })
 
@@ -968,6 +1065,15 @@ function changeNumberStart() {
 const answerShown = computed(
   () => highlightOnes.value && droneOn.value && droneNote.value === numberStart.value,
 )
+
+// With the "Mélodies" preset, a melody is picked right away (the first one
+// listed) when none is, so that it can be played at once. The melodies may
+// still be loading when the preset is chosen, hence the watch on both.
+watch([currentPreset, melodies], () => {
+  if (currentPreset.value === 'melodies' && !melodyKey.value && melodies.value.length) {
+    melodyKey.value = melodyGroups.value[0].melodies[0].key
+  }
+})
 
 function setAnswerShown(shown) {
   highlightOnes.value = shown
@@ -1060,7 +1166,7 @@ const showAllSettings = ref(false)
             :highlighted="isHighlighted(firstNote + i)"
             :highlight-one="highlightOnes && isOneNote(firstNote + i)"
             :in-tessitura="inTessitura(firstNote + i)"
-            :playing="playingNotes.has(firstNote + i)"
+            :playing="isPlaying(firstNote + i)"
             :in-chord="hoveredChordNotes.includes(firstNote + i)"
             :marked="markedNotes.has(firstNote + i)"
             :drone="droneOn && droneNote === firstNote + i"
@@ -1206,6 +1312,89 @@ const showAllSettings = ref(false)
         >
           Réponse
         </button>
+      </div>
+
+      <div
+        v-if="currentPreset === 'melodies' && melodies.length"
+        class="flex flex-col gap-3"
+      >
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- Same melody list and controls as in the detailed settings -->
+        <select
+          v-model="melodyKey"
+          aria-label="Mélodies"
+          class="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
+        >
+          <option value="">Aucune</option>
+          <template v-for="g in melodyGroups" :key="g.label">
+            <optgroup v-if="g.label" :label="g.label">
+              <option v-for="m in g.melodies" :key="m.key" :value="m.key">{{ m.label }}</option>
+            </optgroup>
+            <template v-else>
+              <option v-for="m in g.melodies" :key="m.key" :value="m.key">{{ m.label }}</option>
+            </template>
+          </template>
+        </select>
+        <button
+          type="button"
+          class="cursor-pointer rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100 disabled:cursor-default disabled:opacity-50"
+          :disabled="!selectedMelody"
+          @click="toggleMelody"
+        >
+          {{ melodyPlaying ? 'Arrêter' : 'Écouter la mélodie' }}
+        </button>
+        <button
+          type="button"
+          class="cursor-pointer rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"
+          @click="changeNumberStart"
+        >
+          Changer la note du 1
+        </button>
+        <span class="text-sm tabular-nums text-neutral-400">1 = {{ numberStartName }}</span>
+        <label class="flex cursor-pointer items-center gap-2 px-1">
+          <input v-model="highlightMelody" type="checkbox" class="size-4 accent-neutral-800" />
+          <span class="text-sm text-neutral-600">Mettre en évidence la mélodie</span>
+        </label>
+        <label class="flex items-center gap-2 px-1">
+          <span class="text-sm text-neutral-600">Tempo</span>
+          <input
+            v-model.number="melodyTempo"
+            type="range"
+            min="25"
+            max="200"
+            step="5"
+            class="w-32 accent-neutral-800"
+          />
+          <span class="w-12 text-sm tabular-nums text-neutral-400">{{ melodyTempo }} %</span>
+        </label>
+      </div>
+
+      <!-- The scales only (no pentatonic, interval nor chord): the same
+           setting as the "Gammes / Intervalles / Accords" list, so picking one
+           has the same effects -->
+      <div class="flex flex-wrap items-center gap-3">
+        <select
+          v-model="scaleKey"
+          aria-label="Gammes"
+          class="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
+        >
+          <option value="">Aucune gamme</option>
+          <option v-for="s in scalesOfType('scale')" :key="s.key" :value="s.key">
+            {{ s.label }}
+          </option>
+        </select>
+        <!-- "Entendre les accords", which needs a seven-note scale -->
+        <button
+          type="button"
+          class="cursor-pointer rounded-md border border-neutral-200 px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100 disabled:cursor-default disabled:opacity-50"
+          :class="chordMode ? 'bg-neutral-100' : 'bg-white'"
+          :aria-pressed="chordMode"
+          :disabled="!sevenNoteScale"
+          @click="toggleChordMode"
+        >
+          Mode accord
+        </button>
+      </div>
       </div>
 
       <!-- Detailed settings, hidden by default -->
@@ -1609,30 +1798,34 @@ const showAllSettings = ref(false)
             </div>
           </div>
 
-          <!-- Play the selection (hover to listen) -->
+          <!-- Play the selection (click to listen: hovering would set it off
+               unintentionally when merely moving the pointer across) -->
           <div v-if="selectedScale" class="flex flex-col gap-2 pt-2">
             <span class="text-sm font-medium tracking-wide text-neutral-600">
               Écouter la sélection
             </span>
             <div class="flex gap-2">
-              <div
+              <button
+                type="button"
                 class="flex flex-1 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 px-1 py-2 text-center text-sm text-neutral-600 transition-colors duration-150 select-none cursor-pointer hover:bg-neutral-200"
-                @mouseenter="playSelectionAscending"
+                @click="playSelectionAscending"
               >
                 En montant
-              </div>
-              <div
+              </button>
+              <button
+                type="button"
                 class="flex flex-1 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 px-1 py-2 text-center text-sm text-neutral-600 transition-colors duration-150 select-none cursor-pointer hover:bg-neutral-200"
-                @mouseenter="playSelectionDescending"
+                @click="playSelectionDescending"
               >
                 En descendant
-              </div>
-              <div
+              </button>
+              <button
+                type="button"
                 class="flex flex-1 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 px-1 py-2 text-center text-sm text-neutral-600 transition-colors duration-150 select-none cursor-pointer hover:bg-neutral-200"
-                @mouseenter="playSelectionTogether"
+                @click="playSelectionTogether"
               >
                 Ensemble
-              </div>
+              </button>
             </div>
           </div>
 
@@ -1712,6 +1905,62 @@ const showAllSettings = ref(false)
               />
               <span class="text-sm text-neutral-600">Note tenue</span>
             </label>
+          </div>
+        </div>
+
+        <!-- Melodies (MIDI files from public/midi), played on the current
+             instrument -->
+        <div v-if="melodies.length" class="flex flex-col gap-3">
+          <label for="melody" class="text-sm font-medium tracking-wide text-neutral-600">
+            Mélodies
+          </label>
+          <select
+            id="melody"
+            v-model="melodyKey"
+            class="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
+          >
+            <option value="">Aucune</option>
+            <template v-for="g in melodyGroups" :key="g.label">
+              <optgroup v-if="g.label" :label="g.label">
+                <option v-for="m in g.melodies" :key="m.key" :value="m.key">{{ m.label }}</option>
+              </optgroup>
+              <template v-else>
+                <option v-for="m in g.melodies" :key="m.key" :value="m.key">{{ m.label }}</option>
+              </template>
+            </template>
+          </select>
+
+          <div v-if="selectedMelody" class="flex flex-col gap-2 pt-1">
+            <button
+              type="button"
+              class="flex items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 px-1 py-2 text-center text-sm text-neutral-600 transition-colors duration-150 select-none cursor-pointer hover:bg-neutral-200"
+              @click="toggleMelody"
+            >
+              {{ melodyPlaying ? 'Arrêter' : 'Écouter la mélodie' }}
+            </button>
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="highlightMelody"
+                type="checkbox"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Mettre en évidence la mélodie</span>
+            </label>
+            <div class="flex flex-col gap-2 pt-1">
+              <div class="flex items-baseline justify-between">
+                <label for="melody-tempo" class="text-sm text-neutral-600">Tempo</label>
+                <span class="text-sm tabular-nums text-neutral-400">{{ melodyTempo }} %</span>
+              </div>
+              <input
+                id="melody-tempo"
+                v-model.number="melodyTempo"
+                type="range"
+                min="25"
+                max="200"
+                step="5"
+                class="w-full accent-neutral-800"
+              />
+            </div>
           </div>
         </div>
         </div>
