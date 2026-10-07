@@ -500,6 +500,14 @@ function toggleChordMode() {
   scaleAudioMode.value = scaleAudioMode.value === 'chords' ? 'all' : 'chords'
 }
 
+// The "Jouer les accords" checkbox of the "Gammes" preset: three-note chords,
+// or back to that preset's listening mode, "N'entendre que les notes de la
+// sélection".
+function setChordsPlayed(played) {
+  if (played) chordSize.value = 3
+  scaleAudioMode.value = played ? 'chords' : 'scale-only'
+}
+
 // Name of the chord currently under the pointer, shown below the squares.
 const hoveredChord = ref('')
 
@@ -763,7 +771,10 @@ const BELOW_SQUARE_KEYS = {
 //   t        sustained notes, or short ones
 //   u        highlight every "1", or not
 //   g        show or hide the glissando band
-//   r        show or hide the answer, in the presets with a "Réponse" button
+//   m        hide the notes out of the selection, or not
+//   r        show the answer, in the presets with a "Réponse" button; when it
+//            is shown, do as the last "Changer" pressed (or hide it, when
+//            none has been yet)
 // Left alone when Ctrl, Alt or Cmd is held, so as not to steal the browser's
 // own shortcuts. They work even when a dropdown has the focus — which it keeps
 // after an option is picked, a preset for instance — so the key is then kept
@@ -787,9 +798,21 @@ const LETTER_SHORTCUTS = {
   g: () => {
     showGlide.value = !showGlide.value
   },
+  m: () => {
+    hideNotesOutOfScale.value = !hideNotesOutOfScale.value
+  },
+  // Once the answer is shown, R moves on to the next question, as the last
+  // "Changer" pressed would: the exercise can be played with this key alone.
   r: () => {
-    if (currentPreset.value === 'guess-root') toggleAnswer()
-    else if (currentPreset.value === 'identify-chords') chordAnswerShown.value = !chordAnswerShown.value
+    if (currentPreset.value === 'guess-root') {
+      if (answerShown.value) nextQuestion()
+      else toggleAnswer()
+    } else if (identifyLists.value) {
+      if (!identifyAnswerShown.value) identifyAnswerShown.value = true
+      // The last list pressed may belong to the other "identify" preset.
+      else if (identifyLists.value.includes(lastIdentifyList)) changeIdentify(lastIdentifyList)
+      else identifyAnswerShown.value = false
+    }
   },
 }
 
@@ -802,7 +825,11 @@ const SHORTCUT_HELP = [
   ['D', 'Drone'],
   ['T', 'Note tenue, ou courte'],
   ['G', 'Glissando'],
-  ['R', 'Réponse (presets « Trouver la tonique » et « Trouver la nature des accords »)'],
+  ['M', 'Masquer les notes hors sélection'],
+  [
+    'R',
+    'Réponse, puis question suivante (presets « Trouver la tonique », « Trouver la nature des accords », « Gammes »)',
+  ],
   ['Échap', 'Effacer les notes marquées'],
 ]
 
@@ -1098,30 +1125,64 @@ function nextQuestion() {
   changeNumberStart()
 }
 
-// The chord lists of the "Trouver la nature des accords" preset, by key of
-// SCALES.
-const CHORD_LISTS = [
-  { label: 'Majeur / Mineur', keys: ['c-maj', 'c-min'] },
-  { label: 'Accords 3 sons', keys: ['c-maj', 'c-min', 'c-dim', 'c-aug'] },
-  {
-    label: 'Accords 4 sons principaux',
-    keys: ['c-maj7', 'c-dom7', 'c-min7', 'c-m7b5', 'c-dim7'],
-  },
-  { label: 'Tous', keys: scalesOfType('chord').map((s) => s.key) },
-].map((list) => ({ ...list, chords: list.keys.map((k) => SCALES.find((s) => s.key === k)) }))
+// The lists of the "identify" presets ("Trouver la nature des accords",
+// "Gammes"), by preset key, each list by keys of SCALES.
+const IDENTIFY_LISTS = Object.fromEntries(
+  Object.entries({
+    'identify-chords': [
+      { label: 'Majeur / Mineur', keys: ['c-maj', 'c-min'] },
+      { label: 'Accords 3 sons', keys: ['c-maj', 'c-min', 'c-dim', 'c-aug'] },
+      {
+        label: 'Accords 4 sons principaux',
+        keys: ['c-maj7', 'c-dom7', 'c-min7', 'c-m7b5', 'c-dim7'],
+      },
+      { label: 'Tous', keys: scalesOfType('chord').map((s) => s.key) },
+    ],
+    'identify-scales': [
+      { label: 'Gammes majeure / mineure', keys: ['ionian', 'aeolian'] },
+      { label: 'Gammes mineures', keys: ['aeolian', 'min-melodic', 'min-harmonic'] },
+      {
+        label: 'Modes',
+        keys: ['ionian', 'dorian', 'phrygian', 'lydian', 'mixolydian', 'aeolian', 'locrian'],
+      },
+      { label: 'Pentatoniques', keys: ['penta-maj', 'penta-min'] },
+      {
+        label: 'Toutes',
+        keys: [...scalesOfType('scale'), ...scalesOfType('pentatonic')].map((s) => s.key),
+      },
+    ],
+  }).map(([preset, lists]) => [
+    preset,
+    lists.map((list) => ({
+      ...list,
+      options: list.keys.map((k) => SCALES.find((s) => s.key === k)),
+    })),
+  ]),
+)
 
-// Whether the chord lists are shown: they give the chord away, so the
-// exercise starts with them hidden.
-const showChordLists = ref(false)
+// The lists of the current preset, or null when it is not an "identify" one.
+const identifyLists = computed(() => IDENTIFY_LISTS[currentPreset.value] ?? null)
 
-// Whether the answer (the current chord) is shown, by the "Réponse" button.
-const chordAnswerShown = ref(false)
+// Whether the lists are shown: they give the answer away, so the exercise
+// starts with them hidden.
+const showIdentifyLists = ref(false)
 
-// Next question of the exercise: any chord of a list (possibly the same one)
-// on another "note du 1", with the answer hidden. The chord quality is what
-// is to be found, not its root.
-function changeChord(list) {
-  chordAnswerShown.value = false
+// Whether the answer (the current chord or scale) is shown, by the "Réponse"
+// button. Hidden again on another question, or another preset.
+const identifyAnswerShown = ref(false)
+watch(currentPreset, () => {
+  identifyAnswerShown.value = false
+})
+
+// The list of the last "Changer" pressed, drawn from again by the R shortcut.
+let lastIdentifyList = null
+
+// Next question of the exercise: any chord or scale of a list (possibly the
+// same one) on another "note du 1", with the answer hidden. Its quality is
+// what is to be found, not its root.
+function changeIdentify(list) {
+  lastIdentifyList = list
+  identifyAnswerShown.value = false
   scaleKey.value = list.keys[drawRandom([0, list.keys.length - 1])]
   changeNumberStart()
 }
@@ -1315,48 +1376,83 @@ const showAllSettings = ref(false)
 
       <!-- Preset actions: controls that only make sense with the current
            preset, one block per preset that has some. -->
-      <div v-if="currentPreset === 'identify-chords'" class="flex flex-col gap-3">
-        <!-- The chord, free in this preset: changing it keeps the preset.
-             One list per set of chords, each with a button drawing one of
-             them; a list not holding the current chord shows it blank. -->
+      <div v-if="identifyLists" class="flex flex-col gap-3">
+        <!-- The chord or scale, free in these presets: changing it keeps the
+             preset. One list per set of them, each with a button drawing one
+             of them; a list not holding the current one shows it blank. -->
+        <div v-if="currentPreset === 'identify-scales'" class="flex flex-wrap items-center gap-3">
+          <!-- "Entendre les accords" with three-note chords when checked,
+               otherwise "N'entendre que les notes de la sélection". Chords
+               are only played on a seven-note scale (see chordMode). -->
+          <label class="flex cursor-pointer items-center gap-2 px-1">
+            <input
+              :checked="scaleAudioMode === 'chords'"
+              type="checkbox"
+              class="size-4 accent-neutral-800"
+              @change="setChordsPlayed($event.target.checked)"
+            />
+            <span class="text-sm text-neutral-600">Jouer les accords</span>
+          </label>
+          <!-- Same setting as "Masquer les notes hors sélection" -->
+          <label class="flex cursor-pointer items-center gap-2 px-1">
+            <input
+              v-model="hideNotesOutOfScale"
+              type="checkbox"
+              class="size-4 accent-neutral-800"
+            />
+            <span class="text-sm text-neutral-600">Masquer les notes hors gammes</span>
+          </label>
+          <!-- "Entendre toutes les notes" when checked, otherwise "N'entendre
+               que les notes de la sélection". Only with the notes out of the
+               scale shown, as hidden ones cannot be played. -->
+          <label v-if="!hideNotesOutOfScale" class="flex cursor-pointer items-center gap-2 px-1">
+            <input
+              :checked="scaleAudioMode === 'all'"
+              type="checkbox"
+              class="size-4 accent-neutral-800"
+              @change="scaleAudioMode = $event.target.checked ? 'all' : 'scale-only'"
+            />
+            <span class="text-sm text-neutral-600">Entendre les notes hors gamme</span>
+          </label>
+        </div>
         <div class="flex flex-wrap items-center gap-3">
           <label class="flex cursor-pointer items-center gap-2 px-1">
-            <input v-model="showChordLists" type="checkbox" class="size-4 accent-neutral-800" />
+            <input v-model="showIdentifyLists" type="checkbox" class="size-4 accent-neutral-800" />
             <span class="text-sm text-neutral-600">Voir les listes</span>
           </label>
           <button
             type="button"
             class="cursor-pointer rounded-md border border-neutral-200 px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"
-            :class="chordAnswerShown ? 'bg-neutral-100' : 'bg-white'"
-            :aria-pressed="chordAnswerShown"
-            @click="chordAnswerShown = !chordAnswerShown"
+            :class="identifyAnswerShown ? 'bg-neutral-100' : 'bg-white'"
+            :aria-pressed="identifyAnswerShown"
+            @click="identifyAnswerShown = !identifyAnswerShown"
           >
             Réponse
           </button>
-          <span v-if="chordAnswerShown" class="text-sm font-medium text-neutral-700">
+          <span v-if="identifyAnswerShown" class="text-sm font-medium text-neutral-700">
             {{ selectedScale?.label ?? 'Aucun' }}
           </span>
         </div>
         <div
-          v-for="list in CHORD_LISTS"
+          v-for="list in identifyLists"
           :key="list.label"
           class="flex flex-wrap items-center gap-3"
         >
           <span class="w-52 text-sm text-neutral-600">{{ list.label }}</span>
           <select
-            v-if="showChordLists"
+            v-if="showIdentifyLists"
             v-model="scaleKey"
             :aria-label="list.label"
             class="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
           >
-            <option v-for="s in list.chords" :key="s.key" :value="s.key">
+            <option v-for="s in list.options" :key="s.key" :value="s.key">
               {{ s.label }}
             </option>
           </select>
           <button
             type="button"
             class="cursor-pointer rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"
-            @click="changeChord(list)"
+            @click="changeIdentify(list)"
           >
             Changer
           </button>

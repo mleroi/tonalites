@@ -88,14 +88,22 @@ export const PRESETS = [
     },
   },
   {
-    key: 'major-scale',
-    label: 'Gamme majeure',
+    key: 'identify-scales',
+    label: 'Gammes',
     settings: {
       instrumentKey: 'piano',
-      scaleKey: 'ionian',
       playMode: 'sustain',
-      labelMode: 'names',
+      octaves: 3,
+      firstNote: 36,
+      scaleKey: 'ionian',
+      scaleHighlightMode: 'all',
+      hideNotesOutOfScale: true,
+      showGlide: false,
     },
+    // The tonic of the scale: any note from Do4 to Si4, drawn again with each
+    // scale by the "Changer" buttons of the preset actions.
+    random: { numberStart: [36, 47] },
+    free: 'all',
   },
   {
     key: 'guess-root',
