@@ -117,6 +117,23 @@ export const PRESETS = [
     free: ['highlightOnes', 'droneOn', 'droneNote', 'scaleKey'],
   },
   {
+    key: 'identify-chords',
+    label: 'Trouver la nature des accords',
+    settings: {
+      instrumentKey: 'piano',
+      playMode: 'sustain',
+      octaves: 6,
+      firstNote: 12,
+      scaleKey: 'c-maj',
+      scaleHighlightMode: 'all',
+      hideNotesOutOfScale: true,
+    },
+    // The root of the chord: any note from Do4 to Si4, drawn again with each
+    // chord by the "Changer" buttons of the preset actions.
+    random: { numberStart: [36, 47] },
+    free: 'all',
+  },
+  {
     key: 'melodies',
     label: 'Mélodies',
     settings: {
