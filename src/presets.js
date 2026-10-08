@@ -88,6 +88,25 @@ export const PRESETS = [
     },
   },
   {
+    key: 'identify-intervals',
+    label: 'Intervalles',
+    settings: {
+      instrumentKey: 'piano',
+      playMode: 'sustain',
+      octaves: 6,
+      firstNote: 12,
+      labelScope: 'all',
+      scaleKey: 'i-p5',
+      scaleHighlightMode: 'all',
+      hideNotesOutOfScale: true,
+      showGlide: false,
+    },
+    // The lower note of the interval: any note from Do4 to Si4, drawn again
+    // with each interval by the "Changer" buttons of the preset actions.
+    random: { numberStart: [36, 47] },
+    free: 'all',
+  },
+  {
     key: 'identify-scales',
     label: 'Gammes',
     settings: {
@@ -95,6 +114,7 @@ export const PRESETS = [
       playMode: 'sustain',
       octaves: 3,
       firstNote: 36,
+      labelScope: 'all',
       scaleKey: 'ionian',
       scaleHighlightMode: 'all',
       hideNotesOutOfScale: true,

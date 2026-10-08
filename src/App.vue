@@ -493,6 +493,13 @@ const chordSize = ref(defaults.chordSize)
 // to a pentatonic or a chord falls back to playing single notes.
 const chordMode = computed(() => scaleAudioMode.value === 'chords' && sevenNoteScale.value)
 
+// The same listening mode with an interval selected ("Jouer l'intervalle" in
+// the "Intervalles" preset): hovering any square plays the interval up from
+// it, whether or not its upper note is shown.
+const intervalMode = computed(
+  () => scaleAudioMode.value === 'chords' && selectedScale.value?.type === 'interval',
+)
+
 // Turns "Entendre les accords" on or off (the "Mode accord" button of the
 // "Mélodies" preset). Off, it goes back to "Entendre toutes les notes", that
 // preset's listening mode.
@@ -502,7 +509,8 @@ function toggleChordMode() {
 
 // The "Jouer les accords" checkbox of the "Gammes" preset: three-note chords,
 // or back to that preset's listening mode, "N'entendre que les notes de la
-// sélection".
+// sélection". Also "Jouer l'intervalle" in the "Intervalles" preset (see
+// intervalMode), where the chord size does not matter.
 function setChordsPlayed(played) {
   if (played) chordSize.value = 3
   scaleAudioMode.value = played ? 'chords' : 'scale-only'
@@ -557,9 +565,11 @@ function chordStripLabel(offset) {
 let sustainedChord = []
 
 // The chord rooted on `semitone`, or null when that note is not in the scale
-// (chords are only built on scale notes).
+// (chords are only built on scale notes). In interval mode, the interval
+// from `semitone`, unnamed: its name would give the answer away.
 function chordOn(semitone) {
   const scale = selectedScale.value
+  if (intervalMode.value) return { notes: [semitone, semitone + scale.intervals[1]], name: '' }
   const rank = scaleRank(semitone, numberStart.value, scale.intervals)
   if (rank < 0) return null
   const intervals = diatonicChordIntervals(scale.intervals, rank, chordSize.value)
@@ -590,7 +600,7 @@ watch(playMode, (mode) => {
 
 // Changing the chord size or the listening mode while a chord is held would
 // leave it with no matching release, so silence whatever is ringing.
-watch([chordSize, scaleAudioMode, chordMode], () => {
+watch([chordSize, scaleAudioMode, chordMode, intervalMode], () => {
   releaseAllNotes()
   playingNotes.value.clear()
   sustainedChord = []
@@ -600,12 +610,13 @@ watch([chordSize, scaleAudioMode, chordMode], () => {
 
 // Pointer enters a square: play it (if audible) according to the play mode,
 // and highlight it (briefly in short mode, until leaving in sustain mode).
-// In chord mode the whole chord is played and highlighted instead.
+// In chord mode the whole chord is played and highlighted instead, and in
+// interval mode the whole interval.
 function enterNote(semitone) {
   // While dragging the keyboard, the squares slide under the pointer: none of
   // them should sound.
   if (panning.value) return
-  if (chordMode.value) {
+  if (chordMode.value || intervalMode.value) {
     const chord = chordOn(semitone)
     if (!chord) {
       // Not a scale note: nothing to play, no name to show and nothing to
@@ -637,9 +648,9 @@ function enterNote(semitone) {
 }
 
 // Pointer leaves a square: stop and unhighlight its sustained note, or the
-// whole chord it was holding.
+// whole chord (or interval) it was holding.
 function leaveNote(semitone) {
-  if (chordMode.value) {
+  if (chordMode.value || intervalMode.value) {
     hoveredChord.value = ''
     hoveredChordNotes.value = []
     sustainedChord.forEach((n) => {
@@ -828,7 +839,7 @@ const SHORTCUT_HELP = [
   ['M', 'Masquer les notes hors sélection'],
   [
     'R',
-    'Réponse, puis question suivante (presets « Trouver la tonique », « Trouver la nature des accords », « Gammes »)',
+    'Réponse, puis question suivante (presets « Trouver la tonique », « Trouver la nature des accords », « Gammes », « Intervalles »)',
   ],
   ['Échap', 'Effacer les notes marquées'],
 ]
@@ -1126,7 +1137,7 @@ function nextQuestion() {
 }
 
 // The lists of the "identify" presets ("Trouver la nature des accords",
-// "Gammes"), by preset key, each list by keys of SCALES.
+// "Gammes", "Intervalles"), by preset key, each list by keys of SCALES.
 const IDENTIFY_LISTS = Object.fromEntries(
   Object.entries({
     'identify-chords': [
@@ -1150,6 +1161,18 @@ const IDENTIFY_LISTS = Object.fromEntries(
         label: 'Toutes',
         keys: [...scalesOfType('scale'), ...scalesOfType('pentatonic')].map((s) => s.key),
       },
+    ],
+    'identify-intervals': [
+      { label: 'Quinte / Octave', keys: ['i-p5', 'i-octave'] },
+      { label: 'Quarte / Quinte', keys: ['i-p4', 'i-p5'] },
+      { label: 'Tierces majeure / mineure', keys: ['i-maj3', 'i-min3'] },
+      { label: 'Septièmes majeure / mineure', keys: ['i-maj7', 'i-min7'] },
+      { label: 'Secondes majeure / mineure', keys: ['i-maj2', 'i-min2'] },
+      { label: 'Sixte majeure / mineure', keys: ['i-maj6', 'i-min6'] },
+      // The diminished and augmented fifths share their entry with the
+      // tritone and the minor sixth.
+      { label: 'Quintes diminuée, juste, augmentée', keys: ['i-tritone', 'i-p5', 'i-min6'] },
+      { label: 'Tous', keys: scalesOfType('interval').map((s) => s.key) },
     ],
   }).map(([preset, lists]) => [
     preset,
@@ -1380,10 +1403,13 @@ const showAllSettings = ref(false)
         <!-- The chord or scale, free in these presets: changing it keeps the
              preset. One list per set of them, each with a button drawing one
              of them; a list not holding the current one shows it blank. -->
-        <div v-if="currentPreset === 'identify-scales'" class="flex flex-wrap items-center gap-3">
+        <div
+          v-if="currentPreset === 'identify-scales' || currentPreset === 'identify-intervals'"
+          class="flex flex-wrap items-center gap-3"
+        >
           <!-- "Entendre les accords" with three-note chords when checked,
-               otherwise "N'entendre que les notes de la sélection". Chords
-               are only played on a seven-note scale (see chordMode). -->
+               otherwise "N'entendre que les notes de la sélection". With an
+               interval, the same mode plays it (see intervalMode). -->
           <label class="flex cursor-pointer items-center gap-2 px-1">
             <input
               :checked="scaleAudioMode === 'chords'"
@@ -1391,7 +1417,9 @@ const showAllSettings = ref(false)
               class="size-4 accent-neutral-800"
               @change="setChordsPlayed($event.target.checked)"
             />
-            <span class="text-sm text-neutral-600">Jouer les accords</span>
+            <span class="text-sm text-neutral-600">
+              {{ currentPreset === 'identify-intervals' ? 'Jouer l’intervalle' : 'Jouer les accords' }}
+            </span>
           </label>
           <!-- Same setting as "Masquer les notes hors sélection" -->
           <label class="flex cursor-pointer items-center gap-2 px-1">
