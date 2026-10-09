@@ -620,7 +620,7 @@ watch([chordSize, scaleAudioMode, chordMode, entityMode], () => {
 // Pointer enters a square: play it (if audible) according to the play mode,
 // and highlight it (briefly in short mode, until leaving in sustain mode).
 // In chord mode the whole chord is played and highlighted instead, and in
-// entity mode the whole selection — unless `single` (Ctrl held), which plays
+// entity mode the whole selection — unless `single` (Shift held), which plays
 // the hovered note alone, in the selection or not.
 function enterNote(semitone, single = false) {
   // While dragging the keyboard, the squares slide under the pointer: none of
@@ -810,6 +810,9 @@ const BELOW_SQUARE_KEYS = {
 // as the L key goes through them.
 const LABEL_SCOPE_CYCLE = { single: 'all', all: 'marked', marked: 'single' }
 
+// Same for the scale highlight, gone through with the M key.
+const HIGHLIGHT_MODE_CYCLE = { single: 'all', all: 'none', none: 'single' }
+
 // Keyboard shortcuts:
 //   Escape   clear the marks
 //   Space    play the marked notes together; with Ctrl, as an arpeggio
@@ -821,12 +824,12 @@ const LABEL_SCOPE_CYCLE = { single: 'all', all: 'marked', marked: 'single' }
 //            no longer reloads the page (Ctrl + F5 still does)
 //   d       drone on/off
 //   l        labels on a single octave, then every octave, then the marked
-//            notes only; the scale highlight follows the first two, so that
-//            one press brings them in line
+//            notes only (the scale highlight is left as it is)
 //   t        sustained notes, or short ones
 //   u        highlight every "1", or not
 //   g        show or hide the glissando band
-//   m        hide the notes out of the selection, or not
+//   m        scale highlight on a single octave, then every octave, then none
+//   n        hide the notes out of the selection, or not
 //   r        show the answer, in the presets with a "Réponse" button; when it
 //            is shown, do as the last "Changer" pressed (or hide it, when
 //            none has been yet)
@@ -840,10 +843,7 @@ const LETTER_SHORTCUTS = {
     droneOn.value = !droneOn.value
   },
   l: () => {
-    const scope = LABEL_SCOPE_CYCLE[labelScope.value] ?? 'single'
-    labelScope.value = scope
-    // The scale highlight has no 'marked' scope: it keeps its own then.
-    if (scope !== 'marked') scaleHighlightMode.value = scope
+    labelScope.value = LABEL_SCOPE_CYCLE[labelScope.value] ?? 'single'
   },
   t: () => {
     playMode.value = playMode.value === 'sustain' ? 'short' : 'sustain'
@@ -855,6 +855,9 @@ const LETTER_SHORTCUTS = {
     showGlide.value = !showGlide.value
   },
   m: () => {
+    scaleHighlightMode.value = HIGHLIGHT_MODE_CYCLE[scaleHighlightMode.value] ?? 'single'
+  },
+  n: () => {
     hideNotesOutOfScale.value = !hideNotesOutOfScale.value
   },
   // Once the answer is shown, R moves on to the next question, as the last
@@ -881,7 +884,8 @@ const SHORTCUT_HELP = [
   ['D', 'Drone'],
   ['T', 'Note tenue, ou courte'],
   ['G', 'Glissando'],
-  ['M', 'Masquer les notes hors sélection'],
+  ['M', 'Mise en évidence : une octave, toutes les octaves, aucune'],
+  ['N', 'Masquer les notes hors sélection'],
   [
     'R',
     'Réponse, puis question suivante (presets « Trouver la tonique », « Trouver la nature des accords », « Gammes », « Intervalles »)',
@@ -895,7 +899,7 @@ const SHORTCUT_HELP = [
 // square events (Carre.vue) and the play area handlers.
 const MOUSE_HELP = [
   ['Survol', 'Jouer la note (ou l’accord)'],
-  ['Ctrl + survol', 'Jouer la note seule, même en mode accords ou sélection au survol'],
+  ['Maj + survol', 'Jouer la note seule, même en mode accords ou sélection au survol'],
   ['Clic', 'Marquer la note, ou la démarquer'],
   ['Clic droit', 'En faire la note du 1'],
   ['Ctrl + clic', 'Drone sur cette note (sur la note du drone : l’arrêter)'],
@@ -1103,24 +1107,27 @@ for (const preset of PRESETS) {
     ...Object.keys(preset.settings),
     ...Object.keys(preset.random ?? {}),
     ...(Array.isArray(preset.free) ? preset.free : []),
+    ...(preset.variants ?? []).flatMap((v) => Object.keys(v.settings)),
   ]
   for (const name of names) {
     if (!(name in SETTINGS)) console.warn(`Preset "${preset.key}": unknown setting "${name}"`)
   }
 }
 
-// The preset last chosen (see currentPreset).
+// The preset last chosen (see currentPreset), and its variant ('' = none).
 const appliedPreset = ref(DEFAULT_PRESET.key)
+const appliedVariant = ref('')
 
-// Apply a preset, drawing its random settings. The watchers triggered by the
-// new values run on the next flush, so the flag is only lowered once that
-// flush is done.
-function applyPreset(key) {
+// Apply a preset, with one of its variants or none, drawing its random
+// settings. The watchers triggered by the new values run on the next flush, so
+// the flag is only lowered once that flush is done.
+function applyPreset(key, variantKey = '') {
   const preset = PRESETS.find((p) => p.key === key)
   if (!preset) return
   appliedPreset.value = key
+  appliedVariant.value = variantKey
   applyingPreset = true
-  for (const [name, value] of Object.entries(presetSettings(preset))) {
+  for (const [name, value] of Object.entries(presetSettings(preset, variantKey))) {
     if (!(name in SETTINGS)) continue
     SETTINGS[name].value = typeof value === 'object' ? { ...value } : value
   }
@@ -1139,11 +1146,13 @@ function applyPreset(key) {
 // and a free one (the view included) can hold anything. A preset whose every
 // setting is free would match anything, so it only does as the last chosen.
 // The last chosen preset comes first, so that it is kept as long as it
-// matches, even when the settings also match another one.
+// matches, even when the settings also match another one. It is compared with
+// its variant applied, if one was chosen.
 const currentPreset = computed(() => {
   const matches = (preset) => {
     if (preset.free === 'all') return preset.key === appliedPreset.value
-    return Object.entries(presetSettings(preset)).every(([name, value]) => {
+    const variant = preset.key === appliedPreset.value ? appliedVariant.value : ''
+    return Object.entries(presetSettings(preset, variant)).every(([name, value]) => {
       if (!(name in SETTINGS) || VIEW_SETTINGS.includes(name)) return true
       if (preset.free?.includes(name)) return true
       const current = SETTINGS[name].value
@@ -1156,6 +1165,15 @@ const currentPreset = computed(() => {
   if (applied && matches(applied)) return applied.key
   return PRESETS.find(matches)?.key ?? ''
 })
+
+// The variants of the current preset (see presets.js), or null when it has
+// none, and the one applied ('' = none, or the preset was left meanwhile).
+const presetVariants = computed(
+  () => PRESETS.find((p) => p.key === currentPreset.value)?.variants ?? null,
+)
+const currentVariant = computed(() =>
+  currentPreset.value === appliedPreset.value ? appliedVariant.value : '',
+)
 
 // Draw another "note du 1", other than the one it is: in the range of the
 // current preset when it draws it at random, otherwise from Do4 to Si4.
@@ -1482,6 +1500,18 @@ const showAllSettings = ref(false)
 
       <!-- Preset actions: controls that only make sense with the current
            preset, one block per preset that has some. -->
+      <!-- The variants of the preset, applied on top of it -->
+      <div v-if="presetVariants" class="flex flex-wrap items-center gap-3">
+        <select
+          :value="currentVariant"
+          aria-label="Variante du preset"
+          class="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
+          @change="applyPreset(currentPreset, $event.target.value)"
+        >
+          <option value="">—</option>
+          <option v-for="v in presetVariants" :key="v.key" :value="v.key">{{ v.label }}</option>
+        </select>
+      </div>
       <div v-if="identifyLists" class="flex flex-col gap-3">
         <!-- The chord or scale, free in these presets: changing it keeps the
              preset. One list per set of them, each with a button drawing one

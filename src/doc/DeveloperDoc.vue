@@ -301,6 +301,13 @@ function presetBody(preset) {
     const free = Array.isArray(preset.free) ? `[${preset.free.map(literal).join(', ')}]` : literal(preset.free)
     parts.push(`free: ${free},`)
   }
+  if (preset.variants) {
+    const variants = preset.variants.map((v) => {
+      const settings = Object.entries(v.settings).map(([n, value]) => `${n}: ${literal(value)}`)
+      return `  { key: ${literal(v.key)}, label: ${literal(v.label)}, settings: { ${settings.join(', ')} } },`
+    })
+    parts.push(`variants: [\n${variants.join('\n')}\n],`)
+  }
   return parts.join('\n')
 }
 
@@ -316,6 +323,10 @@ const PRESET_TEMPLATE = `{
   random: { numberStart: [36, 47] },
   // Optional: can then be changed without leaving the preset ('all' = every setting).
   free: ['droneOn', 'droneNote'],
+  // Optional: sub-choices, each applied on top of the settings above.
+  variants: [
+    { key: 'avec-drone', label: 'Avec drone', settings: { droneOn: true } },
+  ],
 },`
 </script>
 
@@ -366,6 +377,11 @@ const PRESET_TEMPLATE = `{
             <code>free</code> (facultatif) : paramètres modifiables sans quitter le preset, ou
             <code>'all'</code> pour tous. Toujours libres :
             <code>{{ VIEW_SETTINGS.join(', ') }}</code>.
+          </li>
+          <li>
+            <code>variants</code> (facultatif) : sous-choix proposés dans une liste déroulante
+            sous les presets, chacun <code>{ key, label, settings }</code>. En choisir un réapplique
+            le preset, puis ses propres <code>settings</code> par-dessus.
           </li>
           <li>
             Un nom de paramètre inconnu est signalé dans la console du navigateur.

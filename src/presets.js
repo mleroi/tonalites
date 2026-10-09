@@ -18,6 +18,11 @@
 // every preset. With `free: 'all'`, every setting is: such a preset matches
 // any settings, so it is only left by choosing another one.
 //
+// A preset can also offer `variants`: sub-choices picked from a dropdown in
+// the preset actions, each { key, label, settings }. Choosing one applies the
+// preset again, then the variant's settings on top of it; the preset alone
+// (no variant) is what choosing it from the "Presets" dropdown gives.
+//
 // Settings and their values:
 //   firstNote        first square, as a semitone index (0 = Do1, 12 = Do2,
 //                    24 = Do3, 36 = Do4…), from 0 to 72
@@ -90,8 +95,60 @@ export const PRESETS = [
     },
   },
   {
-    key: 'identify-intervals',
-    label: 'Intervalles',
+    key: 'note-origins',
+    label: 'Origines',
+    settings: {
+      instrumentKey: 'piano',
+      playMode: 'sustain',
+      highlightOnes: true,
+    },
+    // Chosen in the dropdown of the preset actions.
+    variants: [
+      {
+        key: 'fifth',
+        label: 'Les douzes notes (par le cycle des quintes)',
+        // Settings of this sub-choice, on top of the preset's above.
+        settings: {
+          labelMode: 'numbers',
+          labelScope: 'all',
+          scaleKey: 'i-p5', 
+          scaleAudioMode: 'entity',
+          scaleHighlightMode: 'none',
+          hideLabelsOutOfScale: false,
+        },
+      },
+      {
+        key: 'major-third',
+        label: 'La gamme majeure (par les accords majeurs des I IV V)',
+        // Settings of this sub-choice, on top of the preset's above.
+        settings: {
+          labelMode: 'numbers',
+          labelScope: 'all',
+          scaleKey: 'c-maj', 
+          scaleAudioMode: 'entity',
+          scaleHighlightMode: 'none',
+          hideLabelsOutOfScale: false,
+        },
+      },
+      {
+        key: 'major-scale',
+        label: 'La gamme majeure',
+        // Settings of this sub-choice, on top of the preset's above.
+        settings: {
+          labelMode: 'numbers',
+          labelScope: 'all',
+          scaleKey: 'ionian', 
+          scaleAudioMode: 'scale-only',
+          scaleHighlightMode: 'single',
+          hideLabelsOutOfScale: true,
+        },
+      },
+    ],
+    free: 'all',
+  },
+  {
+    key: 'hear-intervals',
+    label: 'Ecouter les intervalles',
     settings: {
       instrumentKey: 'piano',
       playMode: 'sustain',
@@ -109,8 +166,46 @@ export const PRESETS = [
     free: 'all',
   },
   {
+    key: 'identify-intervals',
+    label: 'Trouver les intervalles',
+    settings: {
+      instrumentKey: 'piano',
+      playMode: 'sustain',
+      octaves: 6,
+      firstNote: 12,
+      labelScope: 'all',
+      scaleKey: 'i-p5',
+      scaleHighlightMode: 'all',
+      hideNotesOutOfScale: true,
+      showGlide: false,
+    },
+    // The lower note of the interval: any note from Do4 to Si4, drawn again
+    // with each interval by the "Changer" buttons of the preset actions.
+    random: { numberStart: [36, 47] },
+    free: 'all',
+  },
+  {
+    key: 'hear-scales',
+    label: 'Ecouter les gammes',
+    settings: {
+      instrumentKey: 'piano',
+      playMode: 'sustain',
+      octaves: 3,
+      firstNote: 36,
+      labelScope: 'all',
+      scaleKey: 'ionian',
+      scaleHighlightMode: 'all',
+      hideNotesOutOfScale: true,
+      showGlide: false,
+    },
+    // The tonic of the scale: any note from Do4 to Si4, drawn again with each
+    // scale by the "Changer" buttons of the preset actions.
+    random: { numberStart: [36, 47] },
+    free: 'all',
+  },
+  {
     key: 'identify-scales',
-    label: 'Gammes',
+    label: 'Trouver les gammes',
     settings: {
       instrumentKey: 'piano',
       playMode: 'sustain',
@@ -192,9 +287,11 @@ export const DEFAULT_PRESET = PRESETS[0]
 // sets them, but moving around never leaves it.
 export const VIEW_SETTINGS = ['firstNote', 'octaves']
 
-// Full settings of a preset: the default ones, overridden by its own.
-export function presetSettings(preset) {
-  return { ...DEFAULT_PRESET.settings, ...preset.settings }
+// Full settings of a preset: the default ones, overridden by its own, then by
+// those of its variant `variantKey` ('' = none).
+export function presetSettings(preset, variantKey = '') {
+  const variant = preset.variants?.find((v) => v.key === variantKey)
+  return { ...DEFAULT_PRESET.settings, ...preset.settings, ...variant?.settings }
 }
 
 // A whole number drawn at random between min and max (both included). When
