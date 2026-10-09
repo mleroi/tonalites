@@ -910,6 +910,10 @@ const HELP = [
   { title: 'Souris', items: MOUSE_HELP },
 ]
 
+// The developer documentation page (doc/developer/index.html), linked below
+// them. Vite's base path differs between dev ("/") and the build.
+const DEVELOPER_DOC_URL = `${import.meta.env.BASE_URL}doc/developer/`
+
 function onKeydown(e) {
   if (e.key === 'Escape') {
     clearMarks()
@@ -2346,6 +2350,12 @@ const showAllSettings = ref(false)
             </template>
           </dl>
         </div>
+        <a
+          :href="DEVELOPER_DOC_URL"
+          class="justify-self-start text-sm text-neutral-400 underline decoration-neutral-300 hover:text-neutral-600 md:col-span-2"
+        >
+          Documentation développeur (paramètres des presets)
+        </a>
       </div>
       </div>
     </footer>

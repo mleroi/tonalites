@@ -51,6 +51,16 @@ export default defineConfig(({ command }) => ({
   // Served under /tonalites/ on GitHub Pages; root path locally in dev.
   base: command === 'build' ? '/tonalites/' : '/',
   plugins: [vue(), tailwindcss(), midiFiles()],
+  build: {
+    // A second page next to the app: the developer documentation, served at
+    // /doc/developer/.
+    rollupOptions: {
+      input: {
+        main: resolve(import.meta.dirname, 'index.html'),
+        developer: resolve(import.meta.dirname, 'doc/developer/index.html'),
+      },
+    },
+  },
   server: {
     // Use polling instead of native inotify watchers: the machine's
     // fs.inotify.max_user_watches limit is already saturated, which
