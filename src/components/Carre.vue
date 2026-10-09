@@ -107,7 +107,7 @@ const props = defineProps({
 // 'press' fires on a left mouse down; 'modifier-press' on a left mouse down
 // with Ctrl (or Cmd on a Mac) held; 'secondary-press' on a right click (the
 // browser context menu is suppressed); 'enter' fires when the pointer moves
-// onto the square; 'leave' fires when it moves out (used to stop a sustained
+// onto the square, telling whether Ctrl (or Cmd) is held; 'leave' fires when it moves out (used to stop a sustained
 // note). No mouse down propagates, whatever the button, so that a click on a
 // square is never mistaken for a click on the empty area around the squares;
 // the wheel does not either, the zoom being reserved for that empty area.
@@ -215,7 +215,7 @@ const droneClasses = computed(() =>
       @mousedown.prevent.stop="onMousedown"
       @contextmenu.prevent="onContextmenu"
       @wheel.stop
-      @mouseenter="emit('enter')"
+      @mouseenter="emit('enter', $event.ctrlKey || $event.metaKey)"
       @mouseleave="emit('leave')"
     >
       <!-- Font size scales with the square width (cqw); hidden once too small. -->

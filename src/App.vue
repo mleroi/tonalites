@@ -122,7 +122,8 @@ watch(droneVolume, (v) => setDroneVolume(v / 2))
 const labelMode = ref(defaults.labelMode)
 
 // Label scope: 'single' = only the octave starting on the "note du 1",
-// 'all' = every octave. Applies to both intervals and numbers.
+// 'all' = every octave, 'marked' = only the notes marked by hand (green).
+// Applies to both intervals and numbers.
 const labelScope = ref(defaults.labelScope)
 
 // How accidentals are written everywhere note names appear: 'sharps' or 'flats'.
@@ -182,11 +183,15 @@ function isOneNote(semitone) {
 const scaleKey = ref(defaults.scaleKey)
 
 // Audio mode for scales: 'scale-only' = only scale notes are heard,
-// 'all' = every note is heard. Only relevant while a scale is selected.
+// 'all' = every note is heard, 'chords' = the scale's chords (see chordMode),
+// 'entity' = the whole selection from any note (see entityMode). Only
+// relevant while a scale is selected.
 const scaleAudioMode = ref(defaults.scaleAudioMode)
 
 // Highlight scope: 'single' = highlight only the octave of the "note du 1",
-// 'all' = highlight scale notes across every octave.
+// 'all' = highlight scale notes across every octave, 'none' = no highlight
+// (the notes out of the selection are then told apart on every octave, see
+// isHighlighted).
 const scaleHighlightMode = ref(defaults.scaleHighlightMode)
 
 // When a scale is selected, hide the labels of squares that are not
@@ -391,11 +396,13 @@ function inScale(semitone) {
   return isInScale(semitone, numberStart.value, selectedScale.value.intervals)
 }
 
-// True if the note should be visually highlighted. In 'single' mode the
-// highlight is limited to the octave starting on the "note du 1".
+// True if the note is within the highlight scope. In 'single' mode the scope
+// is limited to the octave starting on the "note du 1". Also decides which
+// labels and notes are hidden as out of the selection: with no highlight,
+// those keep the whole selection, on every octave.
 function isHighlighted(semitone) {
   if (!inScale(semitone)) return false
-  if (scaleHighlightMode.value === 'all') return true
+  if (scaleHighlightMode.value !== 'single') return true
   const relative = semitone - numberStart.value
   return relative >= 0 && relative < 12
 }
@@ -444,8 +451,8 @@ const numberStartName = computed(() => noteName(numberStart.value, useFlats.valu
 const droneNoteName = computed(() => noteName(droneNote.value, useFlats.value))
 
 // Label to display in a square, based on its distance from `numberStart`.
-// Returns null when nothing should be displayed (no labels, or out of the
-// single octave when scope is 'single').
+// Returns null when nothing should be displayed (no labels, out of the single
+// octave when scope is 'single', or not marked when scope is 'marked').
 function squareLabel(semitone) {
   if (labelMode.value === 'none') {
     return null
@@ -457,6 +464,9 @@ function squareLabel(semitone) {
   }
   const relative = semitone - numberStart.value
   if (labelScope.value === 'single' && !(relative >= 0 && relative < 12)) {
+    return null
+  }
+  if (labelScope.value === 'marked' && !markedNotes.value.has(semitone)) {
     return null
   }
   if (labelMode.value === 'names') {
@@ -493,12 +503,11 @@ const chordSize = ref(defaults.chordSize)
 // to a pentatonic or a chord falls back to playing single notes.
 const chordMode = computed(() => scaleAudioMode.value === 'chords' && sevenNoteScale.value)
 
-// The same listening mode with an interval selected ("Jouer l'intervalle" in
-// the "Intervalles" preset): hovering any square plays the interval up from
-// it, whether or not its upper note is shown.
-const intervalMode = computed(
-  () => scaleAudioMode.value === 'chords' && selectedScale.value?.type === 'interval',
-)
+// "Jouer la sélection au survol": hovering any square plays the whole selection
+// (scale, interval or chord) up from it, whether or not that square or the
+// other notes are in the selection — so sweeping the keyboard transposes it.
+// Also "Jouer l'intervalle" in the "Intervalles" preset.
+const entityMode = computed(() => scaleAudioMode.value === 'entity' && selectedScale.value !== null)
 
 // Turns "Entendre les accords" on or off (the "Mode accord" button of the
 // "Mélodies" preset). Off, it goes back to "Entendre toutes les notes", that
@@ -509,8 +518,7 @@ function toggleChordMode() {
 
 // The "Jouer les accords" checkbox of the "Gammes" preset: three-note chords,
 // or back to that preset's listening mode, "N'entendre que les notes de la
-// sélection". Also "Jouer l'intervalle" in the "Intervalles" preset (see
-// intervalMode), where the chord size does not matter.
+// sélection".
 function setChordsPlayed(played) {
   if (played) chordSize.value = 3
   scaleAudioMode.value = played ? 'chords' : 'scale-only'
@@ -565,11 +573,12 @@ function chordStripLabel(offset) {
 let sustainedChord = []
 
 // The chord rooted on `semitone`, or null when that note is not in the scale
-// (chords are only built on scale notes). In interval mode, the interval
-// from `semitone`, unnamed: its name would give the answer away.
+// (chords are only built on scale notes). In entity mode, the whole selection
+// from `semitone`, unnamed: its name would give the answer away in the
+// presets where it is to be found.
 function chordOn(semitone) {
   const scale = selectedScale.value
-  if (intervalMode.value) return { notes: [semitone, semitone + scale.intervals[1]], name: '' }
+  if (entityMode.value) return { notes: scale.intervals.map((d) => semitone + d), name: '' }
   const rank = scaleRank(semitone, numberStart.value, scale.intervals)
   if (rank < 0) return null
   const intervals = diatonicChordIntervals(scale.intervals, rank, chordSize.value)
@@ -600,7 +609,7 @@ watch(playMode, (mode) => {
 
 // Changing the chord size or the listening mode while a chord is held would
 // leave it with no matching release, so silence whatever is ringing.
-watch([chordSize, scaleAudioMode, chordMode, intervalMode], () => {
+watch([chordSize, scaleAudioMode, chordMode, entityMode], () => {
   releaseAllNotes()
   playingNotes.value.clear()
   sustainedChord = []
@@ -611,12 +620,26 @@ watch([chordSize, scaleAudioMode, chordMode, intervalMode], () => {
 // Pointer enters a square: play it (if audible) according to the play mode,
 // and highlight it (briefly in short mode, until leaving in sustain mode).
 // In chord mode the whole chord is played and highlighted instead, and in
-// interval mode the whole interval.
-function enterNote(semitone) {
+// entity mode the whole selection — unless `single` (Ctrl held), which plays
+// the hovered note alone, in the selection or not.
+function enterNote(semitone, single = false) {
   // While dragging the keyboard, the squares slide under the pointer: none of
   // them should sound.
   if (panning.value) return
-  if (chordMode.value || intervalMode.value) {
+  if ((chordMode.value || entityMode.value) && single) {
+    hoveredChord.value = ''
+    hoveredChordNotes.value = []
+    // Held as a one-note chord, so that leaving the square releases it.
+    if (playMode.value === 'sustain') {
+      startNote(semitone)
+      playingNotes.value.add(semitone)
+      sustainedChord = [semitone]
+    } else {
+      playAndFlash(semitone, 250)
+    }
+    return
+  }
+  if (chordMode.value || entityMode.value) {
     const chord = chordOn(semitone)
     if (!chord) {
       // Not a scale note: nothing to play, no name to show and nothing to
@@ -648,9 +671,9 @@ function enterNote(semitone) {
 }
 
 // Pointer leaves a square: stop and unhighlight its sustained note, or the
-// whole chord (or interval) it was holding.
+// whole chord (or selection) it was holding.
 function leaveNote(semitone) {
-  if (chordMode.value || intervalMode.value) {
+  if (chordMode.value || entityMode.value) {
     hoveredChord.value = ''
     hoveredChordNotes.value = []
     sustainedChord.forEach((n) => {
@@ -755,6 +778,21 @@ function clearMarks() {
   markedNotes.value.clear()
 }
 
+// Marked notes from low to high, shown with their names above the presets'
+// actions.
+const sortedMarkedNotes = computed(() => [...markedNotes.value].sort((a, b) => a - b))
+
+// Play all marked notes at once.
+function playMarkedNotes() {
+  clearPlayback()
+  sortedMarkedNotes.value.forEach((n) => playAndFlash(n, 600))
+}
+
+// Play the marked notes one by one, from low to high.
+function playMarkedArpeggio() {
+  playSequence(sortedMarkedNotes.value)
+}
+
 // Label modes reached with F1..F4, in the order of the radio buttons after
 // "Aucun" (reached by pressing again the key of the current mode).
 const LABEL_MODE_KEYS = { F1: 'numbers', F2: 'intervals', F3: 'names', F4: 'degrees' }
@@ -768,8 +806,13 @@ const BELOW_SQUARE_KEYS = {
   F8: showDegrees,
 }
 
+// Label scopes in the order of their radio buttons, each leading to the next,
+// as the L key goes through them.
+const LABEL_SCOPE_CYCLE = { single: 'all', all: 'marked', marked: 'single' }
+
 // Keyboard shortcuts:
 //   Escape   clear the marks
+//   Space    play the marked notes together; with Ctrl, as an arpeggio
 //   F1..F4   label mode, from "Numérotation" to "Degrés"; pressing again the
 //            key of the mode already on goes back to "Aucun". Like its radio
 //            button, "Degrés" is only there with a seven-note scale
@@ -777,8 +820,9 @@ const BELOW_SQUARE_KEYS = {
 //            on/off. The degrees only with a seven-note scale, as above; F5
 //            no longer reloads the page (Ctrl + F5 still does)
 //   d       drone on/off
-//   a        labels and scale highlight on every octave, or on a single one
-//            (both follow the labels, so that one press brings them in line)
+//   l        labels on a single octave, then every octave, then the marked
+//            notes only; the scale highlight follows the first two, so that
+//            one press brings them in line
 //   t        sustained notes, or short ones
 //   u        highlight every "1", or not
 //   g        show or hide the glissando band
@@ -795,10 +839,11 @@ const LETTER_SHORTCUTS = {
   d: () => {
     droneOn.value = !droneOn.value
   },
-  a: () => {
-    const scope = labelScope.value === 'all' ? 'single' : 'all'
+  l: () => {
+    const scope = LABEL_SCOPE_CYCLE[labelScope.value] ?? 'single'
     labelScope.value = scope
-    scaleHighlightMode.value = scope
+    // The scale highlight has no 'marked' scope: it keeps its own then.
+    if (scope !== 'marked') scaleHighlightMode.value = scope
   },
   t: () => {
     playMode.value = playMode.value === 'sustain' ? 'short' : 'sustain'
@@ -831,7 +876,7 @@ const LETTER_SHORTCUTS = {
 const SHORTCUT_HELP = [
   ['F1 … F4', 'Libellés : numérotation, intervalles, nom des notes, degrés (même touche : aucun)'],
   ['F5 … F8', 'Sous les cases : notes, notes simples, fréquences, degrés'],
-  ['A', 'Libellés : mise en évidence sur toutes les octaves, ou une seule'],
+  ['L', 'Libellés : une octave, toutes les octaves, notes sélectionnées seulement'],
   ['U', 'Mettre en évidence les 1'],
   ['D', 'Drone'],
   ['T', 'Note tenue, ou courte'],
@@ -842,12 +887,15 @@ const SHORTCUT_HELP = [
     'Réponse, puis question suivante (presets « Trouver la tonique », « Trouver la nature des accords », « Gammes », « Intervalles »)',
   ],
   ['Échap', 'Effacer les notes marquées'],
+  ['Espace', 'Jouer les notes sélectionnées'],
+  ['Ctrl + Espace', 'Jouer les notes sélectionnées en arpège'],
 ]
 
 // The mouse actions, listed next to the shortcuts: keep them in step with the
 // square events (Carre.vue) and the play area handlers.
 const MOUSE_HELP = [
   ['Survol', 'Jouer la note (ou l’accord)'],
+  ['Ctrl + survol', 'Jouer la note seule, même en mode accords ou sélection au survol'],
   ['Clic', 'Marquer la note, ou la démarquer'],
   ['Clic droit', 'En faire la note du 1'],
   ['Ctrl + clic', 'Drone sur cette note (sur la note du drone : l’arrêter)'],
@@ -865,6 +913,15 @@ const HELP = [
 function onKeydown(e) {
   if (e.key === 'Escape') {
     clearMarks()
+    return
+  }
+  // Space plays the marked notes, Ctrl + Space as an arpeggio. Also keeps the
+  // page from scrolling, and a focused button or checkbox from being pressed.
+  if (e.key === ' ' && !e.altKey && !e.metaKey) {
+    e.preventDefault()
+    if (e.repeat) return
+    if (e.ctrlKey) playMarkedArpeggio()
+    else playMarkedNotes()
     return
   }
   if (e.ctrlKey || e.altKey || e.metaKey) return
@@ -1281,7 +1338,7 @@ const showAllSettings = ref(false)
             :degree="squareDegree(firstNote + i)"
             :piano-mode="pianoMode"
             :black="isBlackKey(firstNote + i)"
-            :highlighted="isHighlighted(firstNote + i)"
+            :highlighted="scaleHighlightMode !== 'none' && isHighlighted(firstNote + i)"
             :highlight-one="highlightOnes && isOneNote(firstNote + i)"
             :in-tessitura="inTessitura(firstNote + i)"
             :playing="isPlaying(firstNote + i)"
@@ -1291,7 +1348,7 @@ const showAllSettings = ref(false)
             @press="pressNote(firstNote + i)"
             @modifier-press="toggleDrone(firstNote + i)"
             @secondary-press="setNumberStart(firstNote + i)"
-            @enter="enterNote(firstNote + i)"
+            @enter="(single) => enterNote(firstNote + i, single)"
             @leave="leaveNote(firstNote + i)"
           />
         </div>
@@ -1397,6 +1454,28 @@ const showAllSettings = ref(false)
         </button>
       </div>
 
+      <!-- Notes marked by hand (left click), and buttons playing them -->
+      <div v-if="sortedMarkedNotes.length" class="flex flex-wrap items-center gap-3">
+        <span class="text-sm text-neutral-600">
+          <span class="font-medium tracking-wide">Notes sélectionnées :</span>
+          {{ sortedMarkedNotes.map((n) => noteName(n, useFlats)).join(', ') }}
+        </span>
+        <button
+          type="button"
+          class="cursor-pointer rounded-md border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-sm text-neutral-600 transition-colors duration-150 select-none hover:bg-neutral-200"
+          @click="playMarkedNotes"
+        >
+          Jouer
+        </button>
+        <button
+          type="button"
+          class="cursor-pointer rounded-md border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-sm text-neutral-600 transition-colors duration-150 select-none hover:bg-neutral-200"
+          @click="playMarkedArpeggio"
+        >
+          Jouer en arpège
+        </button>
+      </div>
+
       <!-- Preset actions: controls that only make sense with the current
            preset, one block per preset that has some. -->
       <div v-if="identifyLists" class="flex flex-col gap-3">
@@ -1407,19 +1486,26 @@ const showAllSettings = ref(false)
           v-if="currentPreset === 'identify-scales' || currentPreset === 'identify-intervals'"
           class="flex flex-wrap items-center gap-3"
         >
-          <!-- "Entendre les accords" with three-note chords when checked,
-               otherwise "N'entendre que les notes de la sélection". With an
-               interval, the same mode plays it (see intervalMode). -->
-          <label class="flex cursor-pointer items-center gap-2 px-1">
+          <!-- When checked, "Jouer la sélection au survol" for the intervals, and
+               "Entendre les accords" with three-note chords for the scales;
+               otherwise "N'entendre que les notes de la sélection". -->
+          <label v-if="currentPreset === 'identify-intervals'" class="flex cursor-pointer items-center gap-2 px-1">
+            <input
+              :checked="scaleAudioMode === 'entity'"
+              type="checkbox"
+              class="size-4 accent-neutral-800"
+              @change="scaleAudioMode = $event.target.checked ? 'entity' : 'scale-only'"
+            />
+            <span class="text-sm text-neutral-600">Jouer l’intervalle</span>
+          </label>
+          <label v-else class="flex cursor-pointer items-center gap-2 px-1">
             <input
               :checked="scaleAudioMode === 'chords'"
               type="checkbox"
               class="size-4 accent-neutral-800"
               @change="setChordsPlayed($event.target.checked)"
             />
-            <span class="text-sm text-neutral-600">
-              {{ currentPreset === 'identify-intervals' ? 'Jouer l’intervalle' : 'Jouer les accords' }}
-            </span>
+            <span class="text-sm text-neutral-600">Jouer les accords</span>
           </label>
           <!-- Same setting as "Masquer les notes hors sélection" -->
           <label class="flex cursor-pointer items-center gap-2 px-1">
@@ -1761,6 +1847,15 @@ const showAllSettings = ref(false)
               />
               <span class="text-sm text-neutral-600">Toutes les octaves</span>
             </label>
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="labelScope"
+                type="radio"
+                value="marked"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Notes sélectionnées seulement</span>
+            </label>
           </div>
 
           <!-- Accidentals: affects every note name shown in the app -->
@@ -1973,6 +2068,15 @@ const showAllSettings = ref(false)
               />
               <span class="text-sm text-neutral-600">Entendre toutes les notes</span>
             </label>
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="scaleAudioMode"
+                type="radio"
+                value="entity"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Jouer la sélection au survol</span>
+            </label>
 
             <!-- Chords are built by stacking scale notes, which only makes
                  sense for a seven-note scale -->
@@ -2057,6 +2161,15 @@ const showAllSettings = ref(false)
                 class="size-4 accent-neutral-800"
               />
               <span class="text-sm text-neutral-600">Toutes les octaves</span>
+            </label>
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="scaleHighlightMode"
+                type="radio"
+                value="none"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Aucune</span>
             </label>
 
             <label class="flex cursor-pointer items-center gap-2 pt-1">

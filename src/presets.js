@@ -27,6 +27,7 @@
 //   labelMode        'none' | 'numbers' | 'intervals' | 'names' | 'degrees'
 //                    ('degrees' needs a seven-note scale in scaleKey)
 //   labelScope       'single' (one octave) | 'all' (every octave)
+//                    | 'marked' (notes marked by hand only)
 //   accidentals      'sharps' | 'flats'
 //   intervalNames    spelling of the ambiguous intervals, by semitone:
 //                    { 6: '#4' or 'b5', 8: 'b6' or '#5', 9: 'M6' or '7°' }
@@ -41,9 +42,10 @@
 //                    when numberStart is random)
 //   droneVolume      from 0 to 100
 //   scaleKey         '' (none) or a key of SCALES in notes.js ('ionian'…)
-//   scaleAudioMode   'scale-only' | 'all' | 'chords'
+//   scaleAudioMode   'scale-only' | 'all' | 'chords' | 'entity' (the whole
+//                    selection played from the hovered note)
 //   chordSize        number of notes per chord: 3, 4 or 5
-//   scaleHighlightMode    'single' | 'all'
+//   scaleHighlightMode    'single' | 'all' | 'none'
 //   hideLabelsOutOfScale  true / false
 //   hideNotesOutOfScale   true / false
 //   showDegrees      true / false
