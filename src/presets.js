@@ -23,6 +23,11 @@
 // preset again, then the variant's settings on top of it; the preset alone
 // (no variant) is what choosing it from the "Presets" dropdown gives.
 //
+// A preset or a variant can list `scaleTypes`, kinds of selection among
+// 'scale' (seven-note scales), 'pentatonic', 'interval' and 'chord': a list
+// of them is then shown in the preset actions, setting scaleKey. A variant's
+// list replaces its preset's.
+//
 // Settings and their values:
 //   firstNote        first square, as a semitone index (0 = Do1, 12 = Do2,
 //                    24 = Do3, 36 = Do4…), from 0 to 72
@@ -152,17 +157,13 @@ export const PRESETS = [
     settings: {
       instrumentKey: 'piano',
       playMode: 'sustain',
-      octaves: 6,
-      firstNote: 12,
+      octaves: 2,
+      numberStart: 36,
+      firstNote: 36,
       labelScope: 'all',
-      scaleKey: 'i-p5',
-      scaleHighlightMode: 'all',
-      hideNotesOutOfScale: true,
+      labelMode: 'intervals',
       showGlide: false,
     },
-    // The lower note of the interval: any note from Do4 to Si4, drawn again
-    // with each interval by the "Changer" buttons of the preset actions.
-    random: { numberStart: [36, 47] },
     free: 'all',
   },
   {
@@ -190,17 +191,16 @@ export const PRESETS = [
     settings: {
       instrumentKey: 'piano',
       playMode: 'sustain',
-      octaves: 3,
+      octaves: 2,
+      numberStart: 36,
       firstNote: 36,
       labelScope: 'all',
       scaleKey: 'ionian',
-      scaleHighlightMode: 'all',
-      hideNotesOutOfScale: true,
+      labelMode: 'intervals',
+      scaleAudioMode: 'entity',
+      scaleHighlightMode: 'scaleHighlightMode',
       showGlide: false,
     },
-    // The tonic of the scale: any note from Do4 to Si4, drawn again with each
-    // scale by the "Changer" buttons of the preset actions.
-    random: { numberStart: [36, 47] },
     free: 'all',
   },
   {
@@ -240,6 +240,47 @@ export const PRESETS = [
     // 1") gives the answer away: it can be done to check. The scale the tonic
     // is heard in can be picked among the preset actions.
     free: ['highlightOnes', 'droneOn', 'droneNote', 'scaleKey'],
+  },
+  {
+    key: 'hear-chords',
+    label: 'Ecouter les accords',
+    settings: {
+      instrumentKey: 'piano',
+      playMode: 'sustain',
+      octaves: 2,
+      numberStart: 36,
+      firstNote: 36,
+      labelScope: 'all',
+      scaleKey: 'c-maj',
+      labelMode: 'intervals',
+      scaleHighlightMode: 'all',
+      showGlide: false,
+    },
+    variants: [
+      {
+        key: 'same-root',
+        label: 'Même fondamentale, différentes natures',
+        // Settings of this sub-choice, on top of the preset's above.
+        settings: {
+          scaleAudioMode: 'entity',
+        },
+        // Every kind of chord, listed in the preset actions.
+        scaleTypes: ['chord'],
+      },
+      {
+        key: 'from-scale',
+        label: 'Harmonisation des gammes',
+        // Settings of this sub-choice, on top of the preset's above.
+        settings: {
+          scaleKey: 'ionian',
+          scaleAudioMode: 'chords',
+          labelMode: 'degrees',
+        },
+        // Every seven-note scale, listed in the preset actions.
+        scaleTypes: ['scale'],
+      },
+    ],
+    free: 'all',
   },
   {
     key: 'identify-chords',

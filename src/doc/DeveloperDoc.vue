@@ -304,9 +304,13 @@ function presetBody(preset) {
   if (preset.variants) {
     const variants = preset.variants.map((v) => {
       const settings = Object.entries(v.settings).map(([n, value]) => `${n}: ${literal(value)}`)
-      return `  { key: ${literal(v.key)}, label: ${literal(v.label)}, settings: { ${settings.join(', ')} } },`
+      const types = v.scaleTypes ? `, scaleTypes: [${v.scaleTypes.map(literal).join(', ')}]` : ''
+      return `  { key: ${literal(v.key)}, label: ${literal(v.label)}, settings: { ${settings.join(', ')} }${types} },`
     })
     parts.push(`variants: [\n${variants.join('\n')}\n],`)
+  }
+  if (preset.scaleTypes) {
+    parts.push(`scaleTypes: [${preset.scaleTypes.map(literal).join(', ')}],`)
   }
   return parts.join('\n')
 }
@@ -326,6 +330,8 @@ const PRESET_TEMPLATE = `{
   // Optional: sub-choices, each applied on top of the settings above.
   variants: [
     { key: 'avec-drone', label: 'Avec drone', settings: { droneOn: true } },
+    // Optional, here or on the preset: a list of these selections to pick from.
+    { key: 'modes', label: 'Les modes', settings: {}, scaleTypes: ['scale'] },
   ],
 },`
 </script>
@@ -382,6 +388,12 @@ const PRESET_TEMPLATE = `{
             <code>variants</code> (facultatif) : sous-choix proposés dans une liste déroulante
             sous les presets, chacun <code>{ key, label, settings }</code>. En choisir un réapplique
             le preset, puis ses propres <code>settings</code> par-dessus.
+          </li>
+          <li>
+            <code>scaleTypes</code> (facultatif, sur un preset ou un sous-choix) : types de
+            sélection parmi <code>{{ SCALE_TYPES.map((t) => literal(t.type)).join(', ') }}</code>,
+            proposés dans une liste sous les presets qui règle <code>scaleKey</code>. Celle d’un
+            sous-choix remplace celle du preset.
           </li>
           <li>
             Un nom de paramètre inconnu est signalé dans la console du navigateur.

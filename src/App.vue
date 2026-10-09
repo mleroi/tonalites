@@ -575,14 +575,42 @@ let sustainedChord = []
 // The chord rooted on `semitone`, or null when that note is not in the scale
 // (chords are only built on scale notes). In entity mode, the whole selection
 // from `semitone`, unnamed: its name would give the answer away in the
-// presets where it is to be found.
-function chordOn(semitone) {
+// presets where it is to be found. With `flip` (Ctrl held), a major chord is
+// played minor and a minor one major (see flipThird); with `seventh` (Alt
+// held), with a minor seventh (see minorSeventh). Both only apply to chords.
+function chordOn(semitone, { flip = false, seventh = false } = {}) {
   const scale = selectedScale.value
-  if (entityMode.value) return { notes: scale.intervals.map((d) => semitone + d), name: '' }
+  const alter = (intervals) => {
+    let altered = flip ? flipThird(intervals) : intervals
+    if (seventh) altered = minorSeventh(altered)
+    return altered
+  }
+  if (entityMode.value) {
+    const intervals = scale.type === 'chord' ? alter(scale.intervals) : scale.intervals
+    return { notes: intervals.map((d) => semitone + d), name: '' }
+  }
   const rank = scaleRank(semitone, numberStart.value, scale.intervals)
   if (rank < 0) return null
-  const intervals = diatonicChordIntervals(scale.intervals, rank, chordSize.value)
+  const intervals = alter(diatonicChordIntervals(scale.intervals, rank, chordSize.value))
   return { notes: intervals.map((d) => semitone + d), name: chordName(intervals) }
+}
+
+// A chord's intervals with its third swapped, major for minor or the other way
+// round. Only for a chord with a perfect fifth: a diminished or augmented
+// chord has no major or minor counterpart, and is left as it is.
+function flipThird(intervals) {
+  if (!intervals.includes(7)) return intervals
+  return intervals.map((d) => (d === 3 ? 4 : d === 4 ? 3 : d))
+}
+
+// A chord's intervals with a minor seventh: a major chord becomes a dominant
+// seventh, a minor one a minor seventh. A seventh already there is replaced —
+// a major seventh, or the diminished seventh of a chord with no perfect fifth
+// (where 9 semitones can only be that seventh) — and the notes above it, a
+// ninth for instance, are kept.
+function minorSeventh(intervals) {
+  const isSeventh = (d) => d === 10 || d === 11 || (d === 9 && !intervals.includes(7))
+  return [...intervals.filter((d) => !isSeventh(d)), 10].sort((a, b) => a - b)
 }
 
 // Play mode: 'short' = a brief note on hover (default), 'sustain' = the note
@@ -620,9 +648,11 @@ watch([chordSize, scaleAudioMode, chordMode, entityMode], () => {
 // Pointer enters a square: play it (if audible) according to the play mode,
 // and highlight it (briefly in short mode, until leaving in sustain mode).
 // In chord mode the whole chord is played and highlighted instead, and in
-// entity mode the whole selection — unless `single` (Shift held), which plays
-// the hovered note alone, in the selection or not.
-function enterNote(semitone, single = false) {
+// entity mode the whole selection. With `single` (Shift held), the hovered
+// note is played alone in every mode, even when it is not audible otherwise;
+// with `flip` (Ctrl held), a major chord is played minor and the other way
+// round, and with `seventh` (Alt held), with a minor seventh.
+function enterNote(semitone, { single = false, flip = false, seventh = false } = {}) {
   // While dragging the keyboard, the squares slide under the pointer: none of
   // them should sound.
   if (panning.value) return
@@ -640,7 +670,7 @@ function enterNote(semitone, single = false) {
     return
   }
   if (chordMode.value || entityMode.value) {
-    const chord = chordOn(semitone)
+    const chord = chordOn(semitone, { flip, seventh })
     if (!chord) {
       // Not a scale note: nothing to play, no name to show and nothing to
       // highlight.
@@ -661,7 +691,7 @@ function enterNote(semitone, single = false) {
     }
     return
   }
-  if (!isAudible(semitone)) return
+  if (!single && !isAudible(semitone)) return
   if (playMode.value === 'sustain') {
     startNote(semitone)
     playingNotes.value.add(semitone)
@@ -899,7 +929,9 @@ const SHORTCUT_HELP = [
 // square events (Carre.vue) and the play area handlers.
 const MOUSE_HELP = [
   ['Survol', 'Jouer la note (ou l’accord)'],
-  ['Maj + survol', 'Jouer la note seule, même en mode accords ou sélection au survol'],
+  ['Maj + survol', 'Jouer la note seule, dans tous les modes (même hors sélection)'],
+  ['Ctrl + survol', 'En mode accords : jouer l’accord mineur au lieu de majeur, et inversement'],
+  ['Alt + survol', 'En mode accords : jouer l’accord avec une septième mineure (majeur : dominante 7)'],
   ['Clic', 'Marquer la note, ou la démarquer'],
   ['Clic droit', 'En faire la note du 1'],
   ['Ctrl + clic', 'Drone sur cette note (sur la note du drone : l’arrêter)'],
@@ -1175,6 +1207,16 @@ const currentVariant = computed(() =>
   currentPreset.value === appliedPreset.value ? appliedVariant.value : '',
 )
 
+// The kinds of selection (SCALE_TYPES) offered in a list among the preset
+// actions, by the current variant or else the current preset (`scaleTypes` in
+// presets.js), or null when neither offers any.
+const presetScaleTypes = computed(() => {
+  const preset = PRESETS.find((p) => p.key === currentPreset.value)
+  const variant = preset?.variants?.find((v) => v.key === currentVariant.value)
+  const types = variant?.scaleTypes ?? preset?.scaleTypes
+  return types ? SCALE_TYPES.filter((t) => types.includes(t.type)) : null
+})
+
 // Draw another "note du 1", other than the one it is: in the range of the
 // current preset when it draws it at random, otherwise from Do4 to Si4.
 function changeNumberStart() {
@@ -1370,7 +1412,7 @@ const showAllSettings = ref(false)
             @press="pressNote(firstNote + i)"
             @modifier-press="toggleDrone(firstNote + i)"
             @secondary-press="setNumberStart(firstNote + i)"
-            @enter="(single) => enterNote(firstNote + i, single)"
+            @enter="(modifiers) => enterNote(firstNote + i, modifiers)"
             @leave="leaveNote(firstNote + i)"
           />
         </div>
@@ -1500,9 +1542,12 @@ const showAllSettings = ref(false)
 
       <!-- Preset actions: controls that only make sense with the current
            preset, one block per preset that has some. -->
-      <!-- The variants of the preset, applied on top of it -->
-      <div v-if="presetVariants" class="flex flex-wrap items-center gap-3">
+      <!-- The variants of the preset, applied on top of it, and the list of
+           selections the preset or its variant offers: the same setting as
+           the "Gammes / Intervalles / Accords" list -->
+      <div v-if="presetVariants || presetScaleTypes" class="flex flex-wrap items-center gap-3">
         <select
+          v-if="presetVariants"
           :value="currentVariant"
           aria-label="Variante du preset"
           class="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
@@ -1511,6 +1556,32 @@ const showAllSettings = ref(false)
           <option value="">—</option>
           <option v-for="v in presetVariants" :key="v.key" :value="v.key">{{ v.label }}</option>
         </select>
+        <select
+          v-if="presetScaleTypes"
+          v-model="scaleKey"
+          aria-label="Gammes / Intervalles / Accords"
+          class="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
+        >
+          <optgroup v-for="g in presetScaleTypes" :key="g.type" :label="g.label">
+            <option v-for="s in scalesOfType(g.type)" :key="s.key" :value="s.key">
+              {{ s.label }}
+            </option>
+          </optgroup>
+        </select>
+        <!-- "Jouer la sélection au survol" when checked, otherwise "N'entendre
+             que les notes de la sélection" (checked by the variant itself) -->
+        <label
+          v-if="currentPreset === 'hear-chords' && currentVariant === 'same-root'"
+          class="flex cursor-pointer items-center gap-2 px-1"
+        >
+          <input
+            :checked="scaleAudioMode === 'entity'"
+            type="checkbox"
+            class="size-4 accent-neutral-800"
+            @change="scaleAudioMode = $event.target.checked ? 'entity' : 'scale-only'"
+          />
+          <span class="text-sm text-neutral-600">Jouer l’accord</span>
+        </label>
       </div>
       <div v-if="identifyLists" class="flex flex-col gap-3">
         <!-- The chord or scale, free in these presets: changing it keeps the
@@ -1721,6 +1792,37 @@ const showAllSettings = ref(false)
           Mode accord
         </button>
       </div>
+      </div>
+
+      <!-- The scales and pentatonics: the same setting as the "Gammes /
+           Intervalles / Accords" list, so picking one has the same effects -->
+      <div v-if="currentPreset === 'hear-scales'" class="flex flex-wrap items-center gap-3">
+        <select
+          v-model="scaleKey"
+          aria-label="Gammes"
+          class="rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
+        >
+          <optgroup
+            v-for="g in SCALE_TYPES.filter((t) => t.type === 'scale' || t.type === 'pentatonic')"
+            :key="g.type"
+            :label="g.label"
+          >
+            <option v-for="s in scalesOfType(g.type)" :key="s.key" :value="s.key">
+              {{ s.label }}
+            </option>
+          </optgroup>
+        </select>
+        <!-- "Entendre toutes les notes" when checked, otherwise "N'entendre
+             que les notes de la sélection" -->
+        <label class="flex cursor-pointer items-center gap-2 px-1">
+          <input
+            :checked="scaleAudioMode === 'all'"
+            type="checkbox"
+            class="size-4 accent-neutral-800"
+            @change="scaleAudioMode = $event.target.checked ? 'all' : 'scale-only'"
+          />
+          <span class="text-sm text-neutral-600">Entendre toutes les notes</span>
+        </label>
       </div>
 
       <!-- Detailed settings, hidden by default -->
