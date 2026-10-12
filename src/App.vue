@@ -860,7 +860,8 @@ const HIGHLIGHT_MODE_CYCLE = { single: 'all', all: 'none', none: 'single' }
 //   g        show or hide the glissando band
 //   m        scale highlight on a single octave, then every octave, then none
 //   n        hide the notes out of the selection, or not
-//   r        show the answer, in the presets with a "Réponse" button; when it
+//   a        write the accidentals as sharps, or as flats
+//   r       show the answer, in the presets with a "Réponse" button; when it
 //            is shown, do as the last "Changer" pressed (or hide it, when
 //            none has been yet)
 // Left alone when Ctrl, Alt or Cmd is held, so as not to steal the browser's
@@ -890,6 +891,9 @@ const LETTER_SHORTCUTS = {
   n: () => {
     hideNotesOutOfScale.value = !hideNotesOutOfScale.value
   },
+  a: () => {
+    accidentals.value = accidentals.value === 'flats' ? 'sharps' : 'flats'
+  },
   // Once the answer is shown, R moves on to the next question, as the last
   // "Changer" pressed would: the exercise can be played with this key alone.
   r: () => {
@@ -916,6 +920,7 @@ const SHORTCUT_HELP = [
   ['G', 'Glissando'],
   ['M', 'Mise en évidence : une octave, toutes les octaves, aucune'],
   ['N', 'Masquer les notes hors sélection'],
+  ['A', 'Altérations : dièses, ou bémols'],
   [
     'R',
     'Réponse, puis question suivante (presets « Trouver la tonique », « Trouver la nature des accords », « Gammes », « Intervalles »)',
@@ -1822,6 +1827,35 @@ const showAllSettings = ref(false)
             @change="scaleAudioMode = $event.target.checked ? 'all' : 'scale-only'"
           />
           <span class="text-sm text-neutral-600">Entendre toutes les notes</span>
+        </label>
+      </div>
+
+      <div v-if="currentPreset === 'see-tonalities'" class="flex flex-wrap items-center gap-3">
+        <!-- "Toutes les octaves" for both the labels and the highlight when
+             checked, otherwise "Une octave" for both -->
+        <label class="flex cursor-pointer items-center gap-2 px-1">
+          <input
+            :checked="labelScope === 'all' && scaleHighlightMode === 'all'"
+            type="checkbox"
+            class="size-4 accent-neutral-800"
+            @change="labelScope = scaleHighlightMode = $event.target.checked ? 'all' : 'single'"
+          />
+          <span class="text-sm text-neutral-600">Voir toutes les notes</span>
+        </label>
+        <!-- "Entendre les accords" when checked, otherwise "N'entendre que les
+             notes de la sélection". The chords need a seven-note scale. -->
+        <label
+          class="flex items-center gap-2 px-1"
+          :class="sevenNoteScale ? 'cursor-pointer' : 'cursor-default opacity-50'"
+        >
+          <input
+            :checked="scaleAudioMode === 'chords'"
+            :disabled="!sevenNoteScale"
+            type="checkbox"
+            class="size-4 accent-neutral-800"
+            @change="scaleAudioMode = $event.target.checked ? 'chords' : 'scale-only'"
+          />
+          <span class="text-sm text-neutral-600">Entendre les accords</span>
         </label>
       </div>
 
