@@ -47,6 +47,8 @@
 //   showSimpleNotes  true / false (names without it: Do); not both at once
 //   showFrequencies  true / false
 //   pianoMode        true / false
+//   pianoRealistic   true / false (with pianoMode: the black keys in a row
+//                    above the white ones, as on a keyboard)
 //   droneOn          true / false
 //   droneNote        drone note, as a semitone index, from 0 to 96; it follows
 //                    numberStart, so give it the same value (or make it free
@@ -84,6 +86,7 @@ export const PRESETS = [
       showSimpleNotes: false,
       showFrequencies: false,
       pianoMode: false,
+      pianoRealistic: false,
       droneOn: false,
       droneNote: 36,
       droneVolume: 50,

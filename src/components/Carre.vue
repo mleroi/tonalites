@@ -201,9 +201,11 @@ const droneClasses = computed(() =>
 </script>
 
 <template>
-  <!-- The column (square + label) is the container query context, so both the
-       inner number and the note label react to the rendered square size. -->
   <div class="@container flex min-w-0 flex-1 flex-col items-center gap-1">
+    <!-- The column (square + label) is the container query context, so both
+         the inner number and the note label react to the rendered square
+         size. Written inside it: a comment before it would make the component
+         a fragment in development, which TransitionGroup cannot slide. -->
     <div
       class="flex aspect-square w-full items-center justify-center rounded-md transition duration-150"
       :class="[

@@ -170,6 +170,13 @@ const SETTINGS = [
     values: BOOLEAN,
   },
   {
+    name: 'pianoRealistic',
+    label: 'Mode piano réaliste',
+    where: DETAILED,
+    values: BOOLEAN,
+    notes: 'Seulement avec `pianoMode`, et sans effet quand `hideNotesOutOfScale` masque des notes.',
+  },
+  {
     name: 'droneNote',
     label: 'Note du drone',
     where: DETAILED,

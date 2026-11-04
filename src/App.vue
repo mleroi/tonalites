@@ -63,6 +63,10 @@ const octaves = ref(defaults.octaves)
 // When enabled, squares are colored like piano keys (white / black).
 const pianoMode = ref(defaults.pianoMode)
 
+// With piano mode on, lay the squares out like a keyboard: the white keys
+// side by side, the black ones in a row above (see realisticLayout).
+const pianoRealistic = ref(defaults.pianoRealistic)
+
 // Whether to display the note names below the squares, with their octave
 // number (Do4) or without it (Do). Only one of the two at a time: checking
 // one unchecks the other.
@@ -430,6 +434,59 @@ const carres = computed(() => {
   return hidingNotes.value ? all.filter((i) => isHighlighted(firstNote.value + i)) : all
 })
 
+// Whether the squares are laid out like a keyboard. Not while some squares are
+// left out: there would be no keyboard left to draw.
+const realisticLayout = computed(
+  () => pianoMode.value && pianoRealistic.value && !hidingNotes.value,
+)
+
+// Keyboard layout, one entry per square (indexed like the offsets, every
+// semitone being there). The row is cut into half-key columns, each key
+// spanning two of them: a white key starts two columns after the previous
+// white key, or one after a black key; a black key starts one column after
+// the previous white key, so it sits astride the gap between the two. A row
+// starting on a black key starts with it, the first white key half a key
+// further. `column` counts from 0.
+const keyboardKeys = computed(() => {
+  const keys = []
+  for (const offset of carres.value) {
+    const black = isBlackKey(firstNote.value + offset)
+    const previous = keys.at(-1)
+    let column = 0
+    if (previous) column = previous.column + (black || previous.black ? 1 : 2)
+    keys.push({ offset, black, column })
+  }
+  return keys
+})
+
+// Number of half-key columns of the keyboard.
+const keyboardColumns = computed(() => (keyboardKeys.value.at(-1)?.column ?? 0) + 2)
+
+// Grid placement of a square in the keyboard layout: black keys on the first
+// row, white keys on the second.
+function keyStyle(offset) {
+  const key = keyboardKeys.value[offset]
+  return { gridColumn: `${key.column + 1} / span 2`, gridRow: key.black ? 1 : 2 }
+}
+
+// Whether a square sits on the black-key row, where nothing is written below
+// it: it would run into the white keys.
+function onBlackRow(semitone) {
+  return realisticLayout.value && isBlackKey(semitone)
+}
+
+// Whether the squares slide to their new place: only for a while after the
+// keyboard layout is switched on or off, so the zoom does not make them slide
+// too. Set before the render, as the move is measured around it.
+const layoutSliding = ref(false)
+let layoutSlidingTimer = null
+watch(realisticLayout, () => {
+  layoutSliding.value = true
+  clearTimeout(layoutSlidingTimer)
+  layoutSlidingTimer = setTimeout(() => (layoutSliding.value = false), 1600)
+})
+onUnmounted(() => clearTimeout(layoutSlidingTimer))
+
 // Gap between squares in pixels (Tailwind gap-1.5 = 0.375rem = 6px). Anything
 // that has to line up with the squares — the glissando band, the chord
 // geometry strip — measures them from this.
@@ -442,6 +499,13 @@ const squareWidthCss = computed(() => {
   const count = Math.max(1, carres.value.length)
   return `((100% - ${(count - 1) * SQUARE_GAP}px) / ${count})`
 })
+
+// Width of the keyboard layout, centered in the area: its keys keep the size
+// of the squares, so it is narrower than the row of squares. Each key spans
+// two columns, a square and its gap (half of it on each side).
+const keyboardWidthCss = computed(
+  () => `calc(${keyboardColumns.value / 2} * (${squareWidthCss.value} + ${SQUARE_GAP}px))`,
+)
 
 // Name of the currently selected starting note (shown next to the slider).
 const firstNoteName = computed(() => noteName(firstNote.value, useFlats.value))
@@ -879,8 +943,10 @@ const HIGHLIGHT_MODE_CYCLE = { single: 'all', all: 'none', none: 'single' }
 //   r       show the answer, in the presets with a "Réponse" button; when it
 //            is shown, do as the last "Changer" pressed (or hide it, when
 //            none has been yet)
+//   p        piano mode on/off; with Ctrl, the realistic piano on/off, which
+//            also turns the piano mode on (instead of printing the page)
 // Left alone when Ctrl, Alt or Cmd is held, so as not to steal the browser's
-// own shortcuts. They work even when a dropdown has the focus — which it keeps
+// own shortcuts — but for Ctrl + Space and Ctrl + P. They work even when a dropdown has the focus — which it keeps
 // after an option is picked, a preset for instance — so the key is then kept
 // from also selecting the option starting with that letter. Auto-repeat is
 // ignored, so holding a key does not toggle it on and off.
@@ -909,6 +975,9 @@ const LETTER_SHORTCUTS = {
   a: () => {
     accidentals.value = accidentals.value === 'flats' ? 'sharps' : 'flats'
   },
+  p: () => {
+    pianoMode.value = !pianoMode.value
+  },
   // Once the answer is shown, R moves on to the next question, as the last
   // "Changer" pressed would: the exercise can be played with this key alone.
   r: () => {
@@ -936,6 +1005,8 @@ const SHORTCUT_HELP = [
   ['M', 'Mise en évidence : une octave, toutes les octaves, aucune'],
   ['N', 'Masquer les notes hors sélection'],
   ['A', 'Altérations : dièses, ou bémols'],
+  ['P', 'Mode piano'],
+  ['Ctrl + P', 'Mode piano réaliste'],
   [
     'R',
     'Réponse, puis question suivante (presets « Trouver la tonique », « Trouver la nature des accords », « Gammes », « Intervalles »)',
@@ -982,6 +1053,18 @@ function onKeydown(e) {
     if (e.repeat) return
     if (e.ctrlKey) playMarkedArpeggio()
     else playMarkedNotes()
+    return
+  }
+  // Ctrl + P switches the realistic piano, rather than printing the page.
+  if (e.key.toLowerCase() === 'p' && e.ctrlKey && !e.altKey && !e.metaKey) {
+    e.preventDefault()
+    if (e.repeat) return
+    if (pianoMode.value && pianoRealistic.value) {
+      pianoRealistic.value = false
+    } else {
+      pianoMode.value = true
+      pianoRealistic.value = true
+    }
     return
   }
   if (e.ctrlKey || e.altKey || e.metaKey) return
@@ -1064,8 +1147,24 @@ const glideNoteName = ref('')
 
 // Continuous semitone at a given clientX over the band: the center of square i
 // maps exactly to firstNote + i; in between, the value interpolates linearly.
+// In the keyboard layout, from the center of a key to the center of the next
+// one, which are not evenly spaced.
 function semitoneAtClientX(clientX) {
   const rect = glideTrack.value.getBoundingClientRect()
+  if (realisticLayout.value) {
+    const keys = keyboardKeys.value
+    const x = ((clientX - rect.left) / rect.width) * keyboardColumns.value
+    // A key's center lies one column after its start.
+    const next = keys.findIndex((key) => key.column + 1 > x)
+    let offset
+    if (next === 0) offset = keys[0].offset
+    else if (next === -1) offset = keys.at(-1).offset
+    else {
+      const from = keys[next - 1]
+      offset = from.offset + (x - from.column - 1) / (keys[next].column - from.column)
+    }
+    return { semitone: firstNote.value + offset, fraction: (clientX - rect.left) / rect.width }
+  }
   const count = carres.value.length
   const squareWidth = (rect.width - (count - 1) * SQUARE_GAP) / count
   const step = squareWidth + SQUARE_GAP
@@ -1137,6 +1236,7 @@ const SETTINGS = {
   showSimpleNotes,
   showFrequencies,
   pianoMode,
+  pianoRealistic,
   droneOn,
   droneNote,
   droneVolume,
@@ -1385,11 +1485,12 @@ const showAllSettings = ref(false)
     >
       <div class="flex w-full flex-col gap-3">
         <!-- Continuous glissando band, aligned with the squares row (so not
-             there while some squares are left out) -->
+             there while some squares are left out), or with the keyboard -->
         <div
           v-if="showGlide && !hidingNotes"
           ref="glideTrack"
-          class="relative h-40 w-full cursor-ew-resize touch-none select-none overflow-hidden rounded-md border border-neutral-200 bg-gradient-to-r from-neutral-50 to-neutral-200"
+          :style="realisticLayout ? { width: keyboardWidthCss } : null"
+          class="relative mx-auto h-40 w-full cursor-ew-resize touch-none select-none overflow-hidden rounded-md border border-neutral-200 bg-gradient-to-r from-neutral-50 to-neutral-200"
           @pointerenter="onGlideEnter"
           @pointermove="onGlideMove"
           @pointerleave="onGlideLeave"
@@ -1409,33 +1510,55 @@ const showAllSettings = ref(false)
         </div>
 
         <!-- Notes row -->
-        <div ref="notesRow" class="flex w-full items-start gap-1.5">
-          <Carre
-            v-for="i in carres"
-            :key="i"
-            :index="i"
-            :label="squareLabel(firstNote + i)"
-            :mark-tonic="isOneNote(firstNote + i) && squareLabel(firstNote + i) !== null"
-            :note="squareNoteName(firstNote + i)"
-            :show-note="showNotes || showSimpleNotes"
-            :frequency="`${Math.round(semitoneToFrequency(firstNote + i))} Hz`"
-            :show-frequency="showFrequencies"
-            :degree="squareDegree(firstNote + i)"
-            :piano-mode="pianoMode"
-            :black="isBlackKey(firstNote + i)"
-            :highlighted="scaleHighlightMode !== 'none' && isHighlighted(firstNote + i)"
-            :highlight-one="highlightOnes && isOneNote(firstNote + i)"
-            :in-tessitura="inTessitura(firstNote + i)"
-            :playing="isPlaying(firstNote + i)"
-            :in-chord="hoveredChordNotes.includes(firstNote + i)"
-            :marked="markedNotes.has(firstNote + i)"
-            :drone="droneOn && droneNote === firstNote + i"
-            @press="pressNote(firstNote + i)"
-            @modifier-press="toggleDrone(firstNote + i)"
-            @secondary-press="setNumberStart(firstNote + i)"
-            @enter="(modifiers) => enterNote(firstNote + i, modifiers)"
-            @leave="leaveNote(firstNote + i)"
-          />
+        <!-- In the keyboard layout, a grid of half-key columns (see
+             keyboardKeys). The squares slide to their new place when that
+             layout is switched on or off. -->
+        <div ref="notesRow" class="w-full">
+          <TransitionGroup
+            tag="div"
+            class="items-start"
+            :class="realisticLayout ? 'mx-auto grid gap-y-1.5' : 'flex w-full gap-1.5'"
+            :style="
+              realisticLayout
+                ? {
+                    width: keyboardWidthCss,
+                    gridTemplateColumns: `repeat(${keyboardColumns}, minmax(0, 1fr))`,
+                  }
+                : null
+            "
+            :move-class="
+              layoutSliding ? 'motion-safe:transition-transform motion-safe:duration-[1500ms]' : ''
+            "
+          >
+            <Carre
+              v-for="i in carres"
+              :key="i"
+              :class="realisticLayout ? 'px-[3px]' : ''"
+              :style="realisticLayout ? keyStyle(i) : null"
+              :index="i"
+              :label="squareLabel(firstNote + i)"
+              :mark-tonic="isOneNote(firstNote + i) && squareLabel(firstNote + i) !== null"
+              :note="squareNoteName(firstNote + i)"
+              :show-note="(showNotes || showSimpleNotes) && !onBlackRow(firstNote + i)"
+              :frequency="`${Math.round(semitoneToFrequency(firstNote + i))} Hz`"
+              :show-frequency="showFrequencies && !onBlackRow(firstNote + i)"
+              :degree="onBlackRow(firstNote + i) ? null : squareDegree(firstNote + i)"
+              :piano-mode="pianoMode"
+              :black="isBlackKey(firstNote + i)"
+              :highlighted="scaleHighlightMode !== 'none' && isHighlighted(firstNote + i)"
+              :highlight-one="highlightOnes && isOneNote(firstNote + i)"
+              :in-tessitura="inTessitura(firstNote + i)"
+              :playing="isPlaying(firstNote + i)"
+              :in-chord="hoveredChordNotes.includes(firstNote + i)"
+              :marked="markedNotes.has(firstNote + i)"
+              :drone="droneOn && droneNote === firstNote + i"
+              @press="pressNote(firstNote + i)"
+              @modifier-press="toggleDrone(firstNote + i)"
+              @secondary-press="setNumberStart(firstNote + i)"
+              @enter="(modifiers) => enterNote(firstNote + i, modifiers)"
+              @leave="leaveNote(firstNote + i)"
+            />
+          </TransitionGroup>
         </div>
 
         <!-- What the chord under the pointer is, and how it is built: the two
@@ -2172,16 +2295,31 @@ const showAllSettings = ref(false)
           </span>
         </label>
 
-        <!-- Piano mode -->
-        <label for="piano-mode" class="flex cursor-pointer items-center gap-3">
-          <input
-            id="piano-mode"
-            v-model="pianoMode"
-            type="checkbox"
-            class="size-4 accent-neutral-800"
-          />
-          <span class="text-sm font-medium tracking-wide text-neutral-600">Mode piano</span>
-        </label>
+        <!-- Piano mode, and its keyboard layout (only relevant when it is on) -->
+        <div class="flex flex-col gap-3">
+          <label for="piano-mode" class="flex cursor-pointer items-center gap-3">
+            <input
+              id="piano-mode"
+              v-model="pianoMode"
+              type="checkbox"
+              class="size-4 accent-neutral-800"
+            />
+            <span class="text-sm font-medium tracking-wide text-neutral-600">Mode piano</span>
+          </label>
+          <label
+            v-if="pianoMode"
+            for="piano-realistic"
+            class="flex cursor-pointer items-center gap-3 pl-7"
+          >
+            <input
+              id="piano-realistic"
+              v-model="pianoRealistic"
+              type="checkbox"
+              class="size-4 accent-neutral-800"
+            />
+            <span class="text-sm text-neutral-600">Réaliste</span>
+          </label>
+        </div>
 
         <!-- Drone -->
         <div class="flex flex-col gap-3">
