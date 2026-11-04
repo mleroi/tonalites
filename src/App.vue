@@ -117,7 +117,9 @@ watch(droneNote, (n) => {
 watch(droneVolume, (v) => setDroneVolume(v / 2))
 
 // Label content shown in squares: 'none', 'intervals' (R, b2, M2…),
-// 'numbers' (1..12) or 'names' (Do, Ré…). Intervals/numbers are counted from
+// 'numbers' (1..12), 'semitones' (0..11), 'tones' (0, 0,5 … 5,5) or 'names'
+// (Do, Ré…).
+// Intervals/numbers are counted from
 // the "note du 1" (degree 0); names are the absolute pitch class.
 const labelMode = ref(defaults.labelMode)
 
@@ -476,6 +478,13 @@ function squareLabel(semitone) {
     return romanDegree(semitone)
   }
   const degree = (((relative % 12) + 12) % 12)
+  if (labelMode.value === 'semitones') {
+    return String(degree)
+  }
+  if (labelMode.value === 'tones') {
+    // French decimal comma: 1,5 rather than 1.5
+    return String(degree / 2).replace('.', ',')
+  }
   return labelMode.value === 'intervals' ? intervalName(degree) : String(degree + 1)
 }
 
@@ -827,6 +836,10 @@ function playMarkedArpeggio() {
 // "Aucun" (reached by pressing again the key of the current mode).
 const LABEL_MODE_KEYS = { F1: 'numbers', F2: 'intervals', F3: 'names', F4: 'degrees' }
 
+// F1 goes through the numberings, each leading to the next, before going back
+// to "Aucun".
+const NUMBERS_CYCLE = { numbers: 'semitones', semitones: 'tones', tones: 'none' }
+
 // What is written below the squares, toggled with F5..F8 in the order of the
 // checkboxes.
 const BELOW_SQUARE_KEYS = {
@@ -848,7 +861,9 @@ const HIGHLIGHT_MODE_CYCLE = { single: 'all', all: 'none', none: 'single' }
 //   Space    play the marked notes together; with Ctrl, as an arpeggio
 //   F1..F4   label mode, from "Numérotation" to "Degrés"; pressing again the
 //            key of the mode already on goes back to "Aucun". Like its radio
-//            button, "Degrés" is only there with a seven-note scale
+//            button, "Degrés" is only there with a seven-note scale. F1 goes
+//            from "Numérotation" to "Nombre de demi-tons", "Nombre de tons",
+//            then to "Aucun"
 //   F5..F8   below the squares: notes, simple notes, frequencies, degrees
 //            on/off. The degrees only with a seven-note scale, as above; F5
 //            no longer reloads the page (Ctrl + F5 still does)
@@ -911,7 +926,7 @@ const LETTER_SHORTCUTS = {
 
 // The shortcuts above, as listed at the bottom of the page: keep both in step.
 const SHORTCUT_HELP = [
-  ['F1 … F4', 'Libellés : numérotation, intervalles, nom des notes, degrés (même touche : aucun)'],
+  ['F1 … F4', 'Libellés : numérotation (puis demi-tons, tons), intervalles, nom des notes, degrés (même touche : aucun)'],
   ['F5 … F8', 'Sous les cases : notes, notes simples, fréquences, degrés'],
   ['L', 'Libellés : une octave, toutes les octaves, notes sélectionnées seulement'],
   ['U', 'Mettre en évidence les 1'],
@@ -980,7 +995,8 @@ function onKeydown(e) {
   if (e.repeat) return
   if (mode) {
     if (mode === 'degrees' && !sevenNoteScale.value) return
-    labelMode.value = labelMode.value === mode ? 'none' : mode
+    if (mode === 'numbers' && NUMBERS_CYCLE[labelMode.value]) labelMode.value = NUMBERS_CYCLE[labelMode.value]
+    else labelMode.value = labelMode.value === mode ? 'none' : mode
   } else if (below) {
     if (below === showDegrees && !sevenNoteScale.value) return
     below.value = !below.value
@@ -1966,6 +1982,24 @@ const showAllSettings = ref(false)
               class="size-4 accent-neutral-800"
               />
               <span class="text-sm text-neutral-600">Numérotation</span>
+            </label>
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="labelMode"
+                type="radio"
+                value="semitones"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Nombre de demi-tons</span>
+            </label>
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="labelMode"
+                type="radio"
+                value="tones"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Nombre de tons</span>
             </label>
             <label class="flex cursor-pointer items-center gap-2">
               <input

@@ -34,7 +34,8 @@
 //   octaves          number of octaves displayed, from 1 to 10
 //   numberStart      "note du 1", as a semitone index, from 0 to 96
 //   highlightOnes    true / false
-//   labelMode        'none' | 'numbers' | 'intervals' | 'names' | 'degrees'
+//   labelMode        'none' | 'numbers' | 'semitones' | 'tones'
+//                    | 'intervals' | 'names' | 'degrees'
 //                    ('degrees' needs a seven-note scale in scaleKey)
 //   labelScope       'single' (one octave) | 'all' (every octave)
 //                    | 'marked' (notes marked by hand only)

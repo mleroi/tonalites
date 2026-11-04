@@ -102,6 +102,8 @@ const SETTINGS = [
     values: [
       { value: 'none', label: 'Aucun' },
       { value: 'numbers', label: 'Numérotation' },
+      { value: 'semitones', label: 'Nombre de demi-tons' },
+      { value: 'tones', label: 'Nombre de tons' },
       { value: 'intervals', label: 'Intervalles' },
       { value: 'names', label: 'Nom des notes' },
       { value: 'degrees', label: 'Degrés' },
