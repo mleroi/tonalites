@@ -621,7 +621,38 @@ const hoveredChordNotes = ref([])
 // root, eleven semitones away. Five-note chords go further and are left out.
 const CHORD_STRIP_LENGTH = 12
 const chordStripCells = Array.from({ length: CHORD_STRIP_LENGTH }, (_, i) => i)
-const showChordStrip = computed(() => chordMode.value && chordSize.value <= 4)
+
+// True when the selection is a chord ("Majeur", "Mineur"…) rather than a
+// scale or an interval.
+const chordSelected = computed(() => selectedScale.value?.type === 'chord')
+
+// The chord name and geometry strip below the row: in the chord-listening
+// mode, and whenever the selection is a chord. Not in the "Trouver…" presets
+// while the answer is hidden, since the name would give it away.
+const showChordDetails = computed(
+  () =>
+    (chordMode.value || chordSelected.value) &&
+    !(identifyLists.value && !identifyAnswerShown.value),
+)
+
+// The chord shown there: the one under the pointer, or else, when the
+// selection is a chord, that chord on the "note du 1" — so its nature can be
+// read without hovering. The first note is the chord's root.
+const shownChordNotes = computed(() => {
+  if (hoveredChordNotes.value.length) return hoveredChordNotes.value
+  if (!chordSelected.value) return []
+  return selectedScale.value.intervals.map((d) => numberStart.value + d)
+})
+const shownChordName = computed(() => {
+  if (hoveredChordNotes.value.length) return hoveredChord.value
+  if (!chordSelected.value) return ''
+  return chordName(selectedScale.value.intervals) || selectedScale.value.label
+})
+
+// Five-note chords reach beyond the twelve squares of the strip.
+const showChordStrip = computed(
+  () => showChordDetails.value && (chordSelected.value || chordSize.value <= 4),
+)
 
 // The strip is exactly as wide as twelve squares of the main row, so its
 // squares are the same size and their labels stay readable. The block is then
@@ -636,7 +667,7 @@ const chordStripStyle = computed(() => ({
 // Whether the hovered chord occupies the square `offset` semitones above its
 // root.
 function chordStripFilled(offset) {
-  const notes = hoveredChordNotes.value
+  const notes = shownChordNotes.value
   return notes.length > 0 && notes.includes(notes[0] + offset)
 }
 
@@ -655,8 +686,9 @@ let sustainedChord = []
 
 // The chord rooted on `semitone`, or null when that note is not in the scale
 // (chords are only built on scale notes). In entity mode, the whole selection
-// from `semitone`, unnamed: its name would give the answer away in the
-// presets where it is to be found. With `flip` (Ctrl held), a major chord is
+// from `semitone`, named only when it is a chord (a scale or an interval has
+// no chord name); showChordDetails keeps that name hidden in the presets
+// where it is to be found. With `flip` (Ctrl held), a major chord is
 // played minor and a minor one major (see flipThird); with `seventh` (Alt
 // held), with a minor seventh (see minorSeventh). Both only apply to chords.
 function chordOn(semitone, { flip = false, seventh = false } = {}) {
@@ -667,8 +699,15 @@ function chordOn(semitone, { flip = false, seventh = false } = {}) {
     return altered
   }
   if (entityMode.value) {
-    const intervals = scale.type === 'chord' ? alter(scale.intervals) : scale.intervals
-    return { notes: intervals.map((d) => semitone + d), name: '' }
+    if (scale.type !== 'chord') {
+      return { notes: scale.intervals.map((d) => semitone + d), name: '' }
+    }
+    const intervals = alter(scale.intervals)
+    // A chord missing from the names (sus4, sixth…) keeps the label of the
+    // list, as long as Ctrl or Alt has not changed it.
+    const unchanged = intervals.join() === scale.intervals.join()
+    const name = chordName(intervals) || (unchanged ? scale.label : '')
+    return { notes: intervals.map((d) => semitone + d), name }
   }
   const rank = scaleRank(semitone, numberStart.value, scale.intervals)
   if (rank < 0) return null
@@ -1679,17 +1718,17 @@ const showPositionSettings = ref(false)
         <!-- What the chord under the pointer is, and how it is built: the two
              sit close together so they read as one block, away from the row
              of squares above. -->
-        <div v-if="chordMode" class="flex w-full flex-col gap-1">
+        <div v-if="showChordDetails" class="flex w-full flex-col gap-1">
           <!-- The name row keeps its height whether or not a chord sounds, so
                the squares above never shift while sweeping across them. -->
           <div class="flex h-7 items-center justify-center">
             <span class="select-none text-base tracking-wide text-neutral-600">
-              {{ hoveredChord }}
+              {{ shownChordName }}
             </span>
           </div>
 
           <!-- Geometry of the chord: the strip is always there while the
-               chord mode is on, and always starts at the same place, so only
+               chord details are, and always starts at the same place, so only
                the drawing of the chord moves. -->
           <div
             v-if="showChordStrip"
