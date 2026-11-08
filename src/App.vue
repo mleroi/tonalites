@@ -885,10 +885,34 @@ function clearMarks() {
 // actions.
 const sortedMarkedNotes = computed(() => [...markedNotes.value].sort((a, b) => a - b))
 
-// Play all marked notes at once.
+// Marked notes held by the Space key, sounding and highlighted until it is
+// released (see releaseMarkedNotes).
+let spaceHeldNotes = []
+
+// Play all marked notes at once, briefly.
 function playMarkedNotes() {
   clearPlayback()
   sortedMarkedNotes.value.forEach((n) => playAndFlash(n, 600))
+}
+
+// Start all marked notes at once, held until releaseMarkedNotes.
+function holdMarkedNotes() {
+  clearPlayback()
+  releaseMarkedNotes()
+  spaceHeldNotes = [...sortedMarkedNotes.value]
+  spaceHeldNotes.forEach((n) => {
+    startNote(n)
+    playingNotes.value.add(n)
+  })
+}
+
+// Stop and unhighlight the notes held by the Space key.
+function releaseMarkedNotes() {
+  spaceHeldNotes.forEach((n) => {
+    stopNote(n)
+    playingNotes.value.delete(n)
+  })
+  spaceHeldNotes = []
 }
 
 // Play the marked notes one by one, from low to high.
@@ -922,7 +946,8 @@ const HIGHLIGHT_MODE_CYCLE = { single: 'all', all: 'none', none: 'single' }
 
 // Keyboard shortcuts:
 //   Escape   clear the marks
-//   Space    play the marked notes together; with Ctrl, as an arpeggio
+//   Space    play the marked notes together, for as long as it is held; with
+//            Ctrl, as an arpeggio
 //   F1..F4   label mode, from "Numérotation" to "Degrés"; pressing again the
 //            key of the mode already on goes back to "Aucun". Like its radio
 //            button, "Degrés" is only there with a seven-note scale. F1 goes
@@ -1012,7 +1037,7 @@ const SHORTCUT_HELP = [
     'Réponse, puis question suivante (presets « Trouver la tonique », « Trouver la nature des accords », « Gammes », « Intervalles »)',
   ],
   ['Échap', 'Effacer les notes marquées'],
-  ['Espace', 'Jouer les notes sélectionnées'],
+  ['Espace', 'Jouer les notes sélectionnées, tant que la touche est maintenue'],
   ['Ctrl + Espace', 'Jouer les notes sélectionnées en arpège'],
 ]
 
@@ -1052,7 +1077,7 @@ function onKeydown(e) {
     e.preventDefault()
     if (e.repeat) return
     if (e.ctrlKey) playMarkedArpeggio()
-    else playMarkedNotes()
+    else holdMarkedNotes()
     return
   }
   // Ctrl + P switches the realistic piano, rather than printing the page.
@@ -1087,8 +1112,23 @@ function onKeydown(e) {
     letter()
   }
 }
-onMounted(() => window.addEventListener('keydown', onKeydown))
-onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+// Releasing Space stops the marked notes it was holding.
+function onKeyup(e) {
+  if (e.key === ' ') releaseMarkedNotes()
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  window.addEventListener('keyup', onKeyup)
+  // The keyup is never received once the window has lost the focus, so
+  // release the held notes then, rather than leaving them stuck.
+  window.addEventListener('blur', releaseMarkedNotes)
+})
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('keyup', onKeyup)
+  window.removeEventListener('blur', releaseMarkedNotes)
+})
 
 // Dragging the empty play area scrolls the keyboard sideways: the note in the
 // pointer's column follows the pointer, as if pulled along, by moving the
