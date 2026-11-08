@@ -28,6 +28,5 @@ defineProps({
         </template>
       </dl>
     </div>
-    <slot />
   </div>
 </template>

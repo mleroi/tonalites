@@ -1045,7 +1045,7 @@ const LETTER_SHORTCUTS = {
   },
 }
 
-// The shortcuts above, as listed at the bottom of the page: keep both in step.
+// The shortcuts above, as listed in the help dialog: keep both in step.
 const SHORTCUT_HELP = [
   ['F1 … F4', 'Libellés : numérotation (puis demi-tons, tons), intervalles, nom des notes, degrés (même touche : aucun)'],
   ['F5 … F8', 'Sous les cases : notes, notes simples, fréquences, degrés'],
@@ -1087,7 +1087,7 @@ const MOUSE_HELP = [
   ['Molette à côté', 'Zoomer'],
 ]
 
-// Both references, shown side by side at the bottom of the page.
+// Both references, shown side by side in the help dialog (H).
 const HELP = [
   { title: 'Raccourcis clavier', items: SHORTCUT_HELP },
   { title: 'Souris', items: MOUSE_HELP },
@@ -1108,7 +1108,7 @@ const settingsOpen = ref(false)
 
 // The keys opening the two dialogs, recalled above "Tous les réglages".
 const DIALOG_KEYS = [
-  ['h', 'raccourcis clavier'],
+  ['h', 'raccourcis clavier / souris'],
   ['s', 'réglages'],
 ]
 watch(helpOpen, (open) => open && (settingsOpen.value = false))
@@ -2828,20 +2828,27 @@ const showPositionSettings = ref(false)
       </div>
       </div>
 
-      <!-- Keyboard shortcuts and mouse actions reference (see HELP), shown
-           with the detailed settings -->
-      <HelpSections
+      <!-- Below the detailed settings: where to find the shortcuts and mouse
+           actions (the help dialog, see HELP), and the developer doc -->
+      <div
         v-if="showAllSettings"
-        :sections="HELP"
-        class="border-t border-neutral-100 pt-6"
+        class="flex flex-col items-start gap-3 border-t border-neutral-100 pt-6 text-sm text-neutral-500"
       >
+        <p>
+          Appuyer sur
+          <kbd
+            class="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-sans text-xs text-neutral-600"
+            >h</kbd
+          >
+          pour voir les raccourcis clavier et souris
+        </p>
         <a
           :href="DEVELOPER_DOC_URL"
-          class="justify-self-start text-sm text-neutral-400 underline decoration-neutral-300 hover:text-neutral-600 md:col-span-2"
+          class="text-neutral-400 underline decoration-neutral-300 hover:text-neutral-600"
         >
           Documentation développeur (paramètres des presets)
         </a>
-      </HelpSections>
+      </div>
       </div>
     </footer>
   </div>
