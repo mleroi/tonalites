@@ -40,10 +40,12 @@ that, several layers help you read what you hear:
 - **Presets**: named sets of settings applied in one go, listed in
   `src/presets.js`; the app starts on the default one. Only the preset, the
   sound and the drone switch are shown at first, every other setting sits
-  behind "Tous les réglages".
+  behind "Tous les réglages" — or in a dialog over the page, opened with `s`.
 - **Chromatic row** that always fits the width of the screen, centered, on a
   single line, with squares that scale to the number of notes.
-- **First note** and **number of octaves** sliders (Do1–Do7, 1–10 octaves).
+- **First note** and **number of octaves** sliders (Do1–Do7, 1–10 octaves),
+  folded away under "Position et note du 1" with the reference note settings
+  below, since the mouse now does most of it (wheel, drag, right click).
 - **Labels**: none, intervals, chromatic numbers, scale degrees (Roman
   numerals) or note names — shown for a single octave or repeated across all
   octaves.
@@ -90,27 +92,32 @@ that, several layers help you read what you hear:
   by changing the number of octaves, centered on the note in the pointer's
   column. Dragging the empty play area sideways scrolls the keyboard, the note
   in the pointer's column following the pointer.
-- **Keyboard shortcuts**: `F1`–`F4` pick the label mode, from "Numérotation"
-  to "Degrés" (pressing again the key of the current mode goes back to
-  "Aucun"), `a` shows the labels and the scale highlight on every octave or
-  on a single one, `t` switches between sustained and short notes, `d`
-  starts or stops the drone, and `Escape` clears the marks.
+- **Keyboard shortcuts**, all listed in a help dialog opened with `h`: among
+  them, `F1`–`F4` pick the label mode, from "Numérotation" to "Degrés"
+  (pressing again the key of the current mode goes back to "Aucun"), `Space`
+  plays the marked notes for as long as it is held (`Ctrl + Space` as an
+  arpeggio), `t` switches between sustained and short notes, `d` starts or
+  stops the drone, `n` and `k` hide the notes and the labels outside the
+  selection, `i` switches the interval spelling, `s` opens the settings
+  dialog, and `Escape` closes a dialog or else clears the marks.
 - **Accidentals** displayed as sharps or flats, applied everywhere.
 - **Interval spelling** for the three intervals that have two correct names,
-  chosen by hand and applied everywhere intervals are written: `#4`/`b5`,
+  chosen by hand and applied everywhere intervals are written: `b5`/`#4`,
   `b6`/`#5` and `M6`/`7°` — the right one depends on the chord being read (a
   diminished fifth in a diminished chord, an augmented fourth otherwise), and
-  the app deliberately does not guess.
+  the app deliberately does not guess. `b5` and `b6` by default; `i` switches
+  both to `#4` and `#5`, and back.
 - **Playback modes**: short note on hover, or sustained while the pointer stays
   on the square. Choosing a sampled instrument switches to sustained notes,
   going back to the synth switches to short ones.
 - **Sound ("Sonorité")**: the built-in synth, or a sampled instrument — an
-  acoustic piano or an acoustic guitar. Samples are only downloaded when the
-  instrument is selected, and the synth keeps playing meanwhile, so the app is
-  never silent or blocked.
+  acoustic piano (the default) or an acoustic guitar. Samples are only
+  downloaded when the instrument is selected — the piano's as soon as the app
+  launches — and the synth keeps playing meanwhile, so the app is never silent
+  or blocked.
 - **Drone** with its own note and volume.
 - **Glissando band** for continuous pitch, showing the live frequency and the
-  note name when it lands on an exact pitch.
+  note name when it lands on an exact pitch. Hidden by default (`g` shows it).
 - **Piano mode** coloring (white/black keys).
 - **Optional note names and frequencies** shown below each square; the names
   can be written with their octave number (Do4) or without it (Do).
@@ -165,6 +172,7 @@ src/
   App.vue              Main view: controls and the row of squares
   components/
     Carre.vue          A single note square (label, colors, events)
+    HelpSections.vue   The shortcuts and mouse actions reference
   audio.js             Tone.js setup: notes, drone, glissando, samplers
   notes.js             Note names, intervals, scales, helpers
   instruments.js       Registry of sampled instruments (samples, levels)

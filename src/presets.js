@@ -41,7 +41,7 @@
 //                    | 'marked' (notes marked by hand only)
 //   accidentals      'sharps' | 'flats'
 //   intervalNames    spelling of the ambiguous intervals, by semitone:
-//                    { 6: '#4' or 'b5', 8: 'b6' or '#5', 9: 'M6' or '7°' }
+//                    { 6: 'b5' or '#4', 8: 'b6' or '#5', 9: 'M6' or '7°' }
 //   showGlide        true / false
 //   showNotes        true / false (names with the octave number: Do4)
 //   showSimpleNotes  true / false (names without it: Do); not both at once
@@ -80,8 +80,8 @@ export const PRESETS = [
       labelMode: 'none',
       labelScope: 'single',
       accidentals: 'sharps',
-      intervalNames: { 6: '#4', 8: 'b6', 9: 'M6' },
-      showGlide: true,
+      intervalNames: { 6: 'b5', 8: 'b6', 9: 'M6' },
+      showGlide: false,
       showNotes: false,
       showSimpleNotes: false,
       showFrequencies: false,
@@ -97,8 +97,8 @@ export const PRESETS = [
       hideLabelsOutOfScale: true,
       hideNotesOutOfScale: false,
       showDegrees: false,
-      playMode: 'short',
-      instrumentKey: '',
+      playMode: 'sustain',
+      instrumentKey: 'piano',
       keyChoice: '',
       tessituraChoice: '',
     },

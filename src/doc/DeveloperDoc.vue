@@ -134,7 +134,7 @@ const SETTINGS = [
     name: 'intervalNames',
     label: 'Affichage des intervalles',
     where: DETAILED,
-    range: "{ 6: '#4' ou 'b5', 8: 'b6' ou '#5', 9: 'M6' ou '7°' }",
+    range: "{ 6: 'b5' ou '#4', 8: 'b6' ou '#5', 9: 'M6' ou '7°' }",
     notes: 'Un objet, par demi-ton : donner l’objet complet.',
   },
   {

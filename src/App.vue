@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import Carre from './components/Carre.vue'
+import HelpSections from './components/HelpSections.vue'
 import {
   noteName,
   pitchClassName,
@@ -143,7 +144,7 @@ const useFlats = computed(() => accidentals.value === 'flats')
 // attempt to infer it — the spelling is picked by hand and applies wherever
 // intervals are written, in the squares as on the chord geometry strip.
 const INTERVAL_CHOICES = [
-  { degree: 6, names: ['#4', 'b5'] },
+  { degree: 6, names: ['b5', '#4'] },
   { degree: 8, names: ['b6', '#5'] },
   { degree: 9, names: ['M6', '7°'] },
 ]
@@ -560,13 +561,19 @@ const instrumentLoading = ref(false)
 
 // Identifies the latest selection, so that a slow load which is no longer the
 // current choice does not clear the indicator of the one that replaced it.
+// Run at once too, so that the default instrument's samples start downloading
+// as the app launches, while the welcome overlay is still up.
 let instrumentRequest = 0
-watch(instrumentKey, async (key) => {
-  const request = ++instrumentRequest
-  instrumentLoading.value = key !== ''
-  await setInstrument(key)
-  if (request === instrumentRequest) instrumentLoading.value = false
-})
+watch(
+  instrumentKey,
+  async (key) => {
+    const request = ++instrumentRequest
+    instrumentLoading.value = key !== ''
+    await setInstrument(key)
+    if (request === instrumentRequest) instrumentLoading.value = false
+  },
+  { immediate: true },
+)
 
 // Number of notes in the chords played by the chord-listening mode.
 const chordSize = ref(defaults.chordSize)
@@ -945,7 +952,7 @@ const LABEL_SCOPE_CYCLE = { single: 'all', all: 'marked', marked: 'single' }
 const HIGHLIGHT_MODE_CYCLE = { single: 'all', all: 'none', none: 'single' }
 
 // Keyboard shortcuts:
-//   Escape   clear the marks
+//   Escape   close the help or the settings dialog, or else clear the marks
 //   Space    play the marked notes together, for as long as it is held; with
 //            Ctrl, as an arpeggio
 //   F1..F4   label mode, from "Numérotation" to "Degrés"; pressing again the
@@ -964,6 +971,10 @@ const HIGHLIGHT_MODE_CYCLE = { single: 'all', all: 'none', none: 'single' }
 //   g        show or hide the glissando band
 //   m        scale highlight on a single octave, then every octave, then none
 //   n        hide the notes out of the selection, or not
+//   k        hide the labels out of the selection, or not
+//   i        intervals spelled b5 and b6, or #4 and #5 (M6 / 7° left as is)
+//   h        show or hide the help (shortcuts and mouse actions)
+//   s        show or hide the detailed settings as a dialog
 //   a        write the accidentals as sharps, or as flats
 //   r       show the answer, in the presets with a "Réponse" button; when it
 //            is shown, do as the last "Changer" pressed (or hide it, when
@@ -997,6 +1008,22 @@ const LETTER_SHORTCUTS = {
   n: () => {
     hideNotesOutOfScale.value = !hideNotesOutOfScale.value
   },
+  k: () => {
+    hideLabelsOutOfScale.value = !hideLabelsOutOfScale.value
+  },
+  // Both spellings follow the tritone's: b5 goes with b6, #4 with #5, so a
+  // mixed choice made by hand is brought back to one of these pairs.
+  i: () => {
+    const toSharps = intervalNames.value[6] !== '#4'
+    intervalNames.value[6] = toSharps ? '#4' : 'b5'
+    intervalNames.value[8] = toSharps ? '#5' : 'b6'
+  },
+  h: () => {
+    helpOpen.value = !helpOpen.value
+  },
+  s: () => {
+    settingsOpen.value = !settingsOpen.value
+  },
   a: () => {
     accidentals.value = accidentals.value === 'flats' ? 'sharps' : 'flats'
   },
@@ -1029,6 +1056,7 @@ const SHORTCUT_HELP = [
   ['G', 'Glissando'],
   ['M', 'Mise en évidence : une octave, toutes les octaves, aucune'],
   ['N', 'Masquer les notes hors sélection'],
+  ['K', 'Masquer les libellés hors sélection'],
   ['A', 'Altérations : dièses, ou bémols'],
   ['P', 'Mode piano'],
   ['Ctrl + P', 'Mode piano réaliste'],
@@ -1036,7 +1064,10 @@ const SHORTCUT_HELP = [
     'R',
     'Réponse, puis question suivante (presets « Trouver la tonique », « Trouver la nature des accords », « Gammes », « Intervalles »)',
   ],
-  ['Échap', 'Effacer les notes marquées'],
+  ['I', 'Intervalles : b5 et b6, ou #4 et #5'],
+  ['H', 'Afficher l’aide (raccourcis clavier et souris)'],
+  ['S', 'Afficher tous les réglages'],
+  ['Échap', 'Fermer l’aide ou les réglages, ou effacer les notes marquées'],
   ['Espace', 'Jouer les notes sélectionnées, tant que la touche est maintenue'],
   ['Ctrl + Espace', 'Jouer les notes sélectionnées en arpège'],
 ]
@@ -1066,9 +1097,29 @@ const HELP = [
 // them. Vite's base path differs between dev ("/") and the build.
 const DEVELOPER_DOC_URL = `${import.meta.env.BASE_URL}doc/developer/`
 
+// Whether the help dialog (the shortcuts and mouse actions, see HELP) is
+// shown, over the page. H toggles it; Escape or a click beside it closes it.
+const helpOpen = ref(false)
+
+// Whether the detailed settings are shown as a dialog over the page. S toggles
+// it; Escape or a press beside it closes it. Only one of the two dialogs is
+// open at a time.
+const settingsOpen = ref(false)
+
+// The keys opening the two dialogs, recalled above "Tous les réglages".
+const DIALOG_KEYS = [
+  ['h', 'raccourcis clavier'],
+  ['s', 'réglages'],
+]
+watch(helpOpen, (open) => open && (settingsOpen.value = false))
+watch(settingsOpen, (open) => open && (helpOpen.value = false))
+
 function onKeydown(e) {
   if (e.key === 'Escape') {
-    clearMarks()
+    // Closing a dialog leaves the marks alone.
+    if (helpOpen.value) helpOpen.value = false
+    else if (settingsOpen.value) settingsOpen.value = false
+    else clearMarks()
     return
   }
   // Space plays the marked notes, Ctrl + Space as an arpeggio. Also keeps the
@@ -1494,6 +1545,9 @@ function changeIdentify(list) {
 
 // Whether the detailed settings are shown below the main ones.
 const showAllSettings = ref(false)
+// Whether the keyboard position and numbering settings (first note, octaves,
+// "note du 1") are unfolded among the detailed ones.
+const showPositionSettings = ref(false)
 </script>
 
 <template>
@@ -1511,6 +1565,26 @@ const showAllSettings = ref(false)
       >
         Jouer :)
       </button>
+    </div>
+
+    <!-- Help dialog (H): the shortcuts and mouse actions. A click beside the
+         panel closes it; clicks inside it are kept from reaching the
+         backdrop. -->
+    <div
+      v-if="helpOpen"
+      class="fixed inset-0 z-40 flex items-center justify-center bg-neutral-900/20 p-6 backdrop-blur-xs"
+      @click="helpOpen = false"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Aide"
+        class="max-h-full w-full max-w-4xl overflow-y-auto rounded-xl bg-white p-8 shadow-xl"
+        @click.stop
+      >
+        <HelpSections :sections="HELP" />
+        <p class="mt-6 text-xs text-neutral-400">H, Échap ou un clic à côté pour fermer</p>
+      </div>
     </div>
 
     <!-- Squares display area. A left click anywhere in it clears the marks,
@@ -1691,15 +1765,29 @@ const showAllSettings = ref(false)
           </span>
         </label>
 
-        <!-- Show or hide the detailed settings -->
-        <button
-          type="button"
-          class="cursor-pointer justify-self-start rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100 lg:col-start-4 lg:justify-self-end"
-          :aria-expanded="showAllSettings"
-          @click="showAllSettings = !showAllSettings"
+        <!-- Show or hide the detailed settings, below a reminder of the keys
+             opening the help and settings dialogs -->
+        <div
+          class="flex flex-col items-start gap-3 justify-self-start lg:col-start-4 lg:items-end lg:justify-self-end"
         >
-          {{ showAllSettings ? 'Masquer les réglages ▴' : 'Tous les réglages ▾' }}
-        </button>
+          <div class="flex flex-col items-start gap-1 text-xs text-neutral-400">
+            <span v-for="[key, action] in DIALOG_KEYS" :key="key">
+              <kbd
+                class="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-sans text-neutral-600"
+                >{{ key }}</kbd
+              >
+              : {{ action }}
+            </span>
+          </div>
+          <button
+            type="button"
+            class="cursor-pointer rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"
+            :aria-expanded="showAllSettings"
+            @click="showAllSettings = !showAllSettings"
+          >
+            {{ showAllSettings ? 'Masquer les réglages ▴' : 'Tous les réglages ▾' }}
+          </button>
+        </div>
       </div>
 
       <!-- Notes marked by hand (left click), and buttons playing them -->
@@ -2038,92 +2126,32 @@ const showAllSettings = ref(false)
         </label>
       </div>
 
-      <!-- Detailed settings, hidden by default -->
+      <!-- Detailed settings, hidden by default. The same block is shown either
+           here, below the main settings, or as a dialog over the page (S key):
+           the wrapper then becomes the backdrop — a press on it closes the
+           dialog — and the panel inside it scrolls. A press rather than a
+           click, so that a slider dragged out of the panel does not close it. -->
       <div
-        v-if="showAllSettings"
-        class="grid grid-cols-1 items-start gap-x-10 gap-y-6 border-t border-neutral-100 pt-8 md:grid-cols-2 lg:grid-cols-4"
+        v-if="showAllSettings || settingsOpen"
+        :class="
+          settingsOpen &&
+          'fixed inset-0 z-40 flex items-center justify-center bg-neutral-900/20 p-6 backdrop-blur-xs'
+        "
+        @mousedown.self="settingsOpen = false"
       >
-        <!-- Column 1: notes, octaves, numbering -->
+      <div
+        :role="settingsOpen ? 'dialog' : undefined"
+        :aria-modal="settingsOpen ? 'true' : undefined"
+        :aria-label="settingsOpen ? 'Réglages' : undefined"
+        class="grid grid-cols-1 items-start gap-x-10 gap-y-6 md:grid-cols-2 lg:grid-cols-4"
+        :class="
+          settingsOpen
+            ? 'max-h-full w-full max-w-6xl overflow-y-auto rounded-xl bg-white p-8 shadow-xl'
+            : 'border-t border-neutral-100 pt-8'
+        "
+      >
+        <!-- Column 1: labels, then the keyboard position and numbering -->
         <div class="flex flex-col gap-6">
-        <!-- First note -->
-        <div class="flex flex-col gap-3">
-          <div class="flex items-baseline justify-between">
-            <label for="first-note" class="text-sm font-medium tracking-wide text-neutral-600">
-              Première note
-            </label>
-            <span class="text-sm tabular-nums text-neutral-400">{{ firstNoteName }}</span>
-          </div>
-          <input
-            id="first-note"
-            v-model.number="firstNote"
-            type="range"
-            :min="MIN_NOTE"
-            :max="MAX_NOTE"
-            step="1"
-            class="w-full accent-neutral-800"
-          />
-        </div>
-
-        <!-- Number of octaves -->
-        <div class="flex flex-col gap-3">
-          <div class="flex items-baseline justify-between">
-            <label for="octaves" class="text-sm font-medium tracking-wide text-neutral-600">
-              Nombre d'octaves
-            </label>
-            <span class="text-sm tabular-nums text-neutral-400">{{ octaves }}</span>
-          </div>
-          <input
-            id="octaves"
-            v-model.number="octaves"
-            type="range"
-            min="1"
-            max="10"
-            step="1"
-            class="w-full accent-neutral-800"
-          />
-        </div>
-
-        <!-- Note carrying the number 1 -->
-        <div class="flex flex-col gap-3">
-          <div class="flex items-baseline justify-between">
-            <label for="number-start" class="text-sm font-medium tracking-wide text-neutral-600">
-              Note du « 1 »
-            </label>
-            <span class="text-sm tabular-nums text-neutral-400">{{ numberStartName }}</span>
-          </div>
-          <input
-            id="number-start"
-            v-model.number="numberStart"
-            type="range"
-            :min="MIN_NUMBER_START"
-            :max="MAX_NUMBER_START"
-            step="1"
-            class="w-full accent-neutral-800"
-          />
-        </div>
-
-        <!-- Highlight the "1" notes -->
-        <label for="highlight-ones" class="flex cursor-pointer items-center gap-3">
-          <input
-            id="highlight-ones"
-            v-model="highlightOnes"
-            type="checkbox"
-            class="size-4 accent-neutral-800"
-          />
-          <span class="text-sm font-medium tracking-wide text-neutral-600">
-            Mettre en évidence les 1
-          </span>
-        </label>
-
-        <!-- Draw another "note du 1", also among the preset actions -->
-        <button
-          type="button"
-          class="cursor-pointer self-start rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"
-          @click="changeNumberStart"
-        >
-          Changer la note du 1
-        </button>
-
         <!-- Labels -->
         <div class="flex flex-col gap-3">
           <span class="text-sm font-medium tracking-wide text-neutral-600">Libellés</span>
@@ -2278,6 +2306,99 @@ const showAllSettings = ref(false)
             </div>
           </div>
         </div>
+
+        <!-- Keyboard position and numbering: mostly set with the mouse now
+             (wheel to zoom, drag to scroll, right click for the "note du 1"),
+             so folded away by default -->
+        <button
+          type="button"
+          class="cursor-pointer self-start text-sm font-medium tracking-wide text-neutral-600 hover:text-neutral-800"
+          :aria-expanded="showPositionSettings"
+          @click="showPositionSettings = !showPositionSettings"
+        >
+          Position et note du 1 {{ showPositionSettings ? '▴' : '▾' }}
+        </button>
+
+        <template v-if="showPositionSettings">
+        <!-- First note -->
+        <div class="flex flex-col gap-3">
+          <div class="flex items-baseline justify-between">
+            <label for="first-note" class="text-sm font-medium tracking-wide text-neutral-600">
+              Première note
+            </label>
+            <span class="text-sm tabular-nums text-neutral-400">{{ firstNoteName }}</span>
+          </div>
+          <input
+            id="first-note"
+            v-model.number="firstNote"
+            type="range"
+            :min="MIN_NOTE"
+            :max="MAX_NOTE"
+            step="1"
+            class="w-full accent-neutral-800"
+          />
+        </div>
+
+        <!-- Number of octaves -->
+        <div class="flex flex-col gap-3">
+          <div class="flex items-baseline justify-between">
+            <label for="octaves" class="text-sm font-medium tracking-wide text-neutral-600">
+              Nombre d'octaves
+            </label>
+            <span class="text-sm tabular-nums text-neutral-400">{{ octaves }}</span>
+          </div>
+          <input
+            id="octaves"
+            v-model.number="octaves"
+            type="range"
+            min="1"
+            max="10"
+            step="1"
+            class="w-full accent-neutral-800"
+          />
+        </div>
+
+        <!-- Note carrying the number 1 -->
+        <div class="flex flex-col gap-3">
+          <div class="flex items-baseline justify-between">
+            <label for="number-start" class="text-sm font-medium tracking-wide text-neutral-600">
+              Note du « 1 »
+            </label>
+            <span class="text-sm tabular-nums text-neutral-400">{{ numberStartName }}</span>
+          </div>
+          <input
+            id="number-start"
+            v-model.number="numberStart"
+            type="range"
+            :min="MIN_NUMBER_START"
+            :max="MAX_NUMBER_START"
+            step="1"
+            class="w-full accent-neutral-800"
+          />
+        </div>
+
+        <!-- Highlight the "1" notes -->
+        <label for="highlight-ones" class="flex cursor-pointer items-center gap-3">
+          <input
+            id="highlight-ones"
+            v-model="highlightOnes"
+            type="checkbox"
+            class="size-4 accent-neutral-800"
+          />
+          <span class="text-sm font-medium tracking-wide text-neutral-600">
+            Mettre en évidence les 1
+          </span>
+        </label>
+
+        <!-- Draw another "note du 1", also among the preset actions -->
+        <button
+          type="button"
+          class="cursor-pointer self-start rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 transition-colors duration-150 hover:bg-neutral-100"
+          @click="changeNumberStart"
+        >
+          Changer la note du 1
+        </button>
+        </template>
 
         </div>
 
@@ -2608,6 +2729,45 @@ const showAllSettings = ref(false)
             </label>
           </div>
         </div>
+        </div>
+
+        <!-- Column 4: keys, tessituras, melodies -->
+        <div class="flex flex-col gap-6">
+        <!-- Key (tonalité) -->
+        <div class="flex flex-col gap-3">
+          <label for="key" class="text-sm font-medium tracking-wide text-neutral-600">
+            Tonalités
+          </label>
+          <select
+            id="key"
+            v-model="keyChoice"
+            class="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
+          >
+            <option value="">—</option>
+            <option v-for="t in KEYS" :key="t.key" :value="t.key">
+              {{ t.signature ? `${t.label} (${t.signature})` : t.label }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Tessitura (instrument / voice range) -->
+        <div class="flex flex-col gap-3">
+          <label for="tessitura" class="text-sm font-medium tracking-wide text-neutral-600">
+            Tessitures
+          </label>
+          <select
+            id="tessitura"
+            v-model="tessituraChoice"
+            class="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
+          >
+            <option value="">—</option>
+            <optgroup v-for="g in TESSITURA_TYPES" :key="g.type" :label="g.label">
+              <option v-for="t in tessiturasOfType(g.type)" :key="t.key" :value="t.key">
+                {{ t.label }}
+              </option>
+            </optgroup>
+          </select>
+        </div>
 
         <!-- Melodies (MIDI files from public/midi), played on the current
              instrument -->
@@ -2665,76 +2825,23 @@ const showAllSettings = ref(false)
           </div>
         </div>
         </div>
-
-        <!-- Column 4: keys, tessituras -->
-        <div class="flex flex-col gap-6">
-        <!-- Key (tonalité) -->
-        <div class="flex flex-col gap-3">
-          <label for="key" class="text-sm font-medium tracking-wide text-neutral-600">
-            Tonalités
-          </label>
-          <select
-            id="key"
-            v-model="keyChoice"
-            class="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
-          >
-            <option value="">—</option>
-            <option v-for="t in KEYS" :key="t.key" :value="t.key">
-              {{ t.signature ? `${t.label} (${t.signature})` : t.label }}
-            </option>
-          </select>
-        </div>
-
-        <!-- Tessitura (instrument / voice range) -->
-        <div class="flex flex-col gap-3">
-          <label for="tessitura" class="text-sm font-medium tracking-wide text-neutral-600">
-            Tessitures
-          </label>
-          <select
-            id="tessitura"
-            v-model="tessituraChoice"
-            class="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-700 accent-neutral-800 focus:border-neutral-400 focus:outline-none"
-          >
-            <option value="">—</option>
-            <optgroup v-for="g in TESSITURA_TYPES" :key="g.type" :label="g.label">
-              <option v-for="t in tessiturasOfType(g.type)" :key="t.key" :value="t.key">
-                {{ t.label }}
-              </option>
-            </optgroup>
-          </select>
-        </div>
-        </div>
+      </div>
       </div>
 
       <!-- Keyboard shortcuts and mouse actions reference (see HELP), shown
            with the detailed settings -->
-      <div
+      <HelpSections
         v-if="showAllSettings"
-        class="grid grid-cols-1 items-start gap-x-10 gap-y-6 border-t border-neutral-100 pt-6 md:grid-cols-2"
+        :sections="HELP"
+        class="border-t border-neutral-100 pt-6"
       >
-        <div v-for="section in HELP" :key="section.title" class="flex flex-col gap-3">
-          <span class="text-sm font-medium tracking-wide text-neutral-600">
-            {{ section.title }}
-          </span>
-          <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm text-neutral-500">
-            <template v-for="[keys, action] in section.items" :key="keys">
-              <dt>
-                <kbd
-                  class="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-sans text-xs text-neutral-600"
-                  >{{ keys }}</kbd
-                >
-              </dt>
-              <dd>{{ action }}</dd>
-            </template>
-          </dl>
-        </div>
         <a
           :href="DEVELOPER_DOC_URL"
           class="justify-self-start text-sm text-neutral-400 underline decoration-neutral-300 hover:text-neutral-600 md:col-span-2"
         >
           Documentation développeur (paramètres des presets)
         </a>
-      </div>
+      </HelpSections>
       </div>
     </footer>
   </div>
