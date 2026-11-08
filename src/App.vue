@@ -2410,7 +2410,7 @@ const showPositionSettings = ref(false)
 
         </div>
 
-        <!-- Column 2: display options, piano, drone -->
+        <!-- Column 2: display options, piano, drone, play mode -->
         <div class="flex flex-col gap-6">
         <!-- Glissando band -->
         <label for="show-glide" class="flex cursor-pointer items-center gap-3">
@@ -2543,9 +2543,36 @@ const showPositionSettings = ref(false)
             />
           </div>
         </div>
+
+        <!-- Play mode -->
+        <div class="flex flex-col gap-3">
+          <span class="text-sm font-medium tracking-wide text-neutral-600"
+            >Mode de jeu<ShortcutKey>T</ShortcutKey></span
+          >
+          <div class="flex flex-wrap gap-x-6 gap-y-2">
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="playMode"
+                type="radio"
+                value="short"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Note courte</span>
+            </label>
+            <label class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="playMode"
+                type="radio"
+                value="sustain"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600">Note tenue</span>
+            </label>
+          </div>
+        </div>
         </div>
 
-        <!-- Column 3: scales/intervals/chords, play mode -->
+        <!-- Column 3: scales/intervals/chords -->
         <div class="flex flex-col gap-6">
         <!-- Scale -->
         <div class="flex flex-col gap-3">
@@ -2721,33 +2748,6 @@ const showPositionSettings = ref(false)
               <span class="text-sm text-neutral-600"
                 >Afficher les degrés<ShortcutKey>F8</ShortcutKey></span
               >
-            </label>
-          </div>
-        </div>
-
-        <!-- Play mode -->
-        <div class="flex flex-col gap-3">
-          <span class="text-sm font-medium tracking-wide text-neutral-600"
-            >Mode de jeu<ShortcutKey>T</ShortcutKey></span
-          >
-          <div class="flex flex-wrap gap-x-6 gap-y-2">
-            <label class="flex cursor-pointer items-center gap-2">
-              <input
-                v-model="playMode"
-                type="radio"
-                value="short"
-                class="size-4 accent-neutral-800"
-              />
-              <span class="text-sm text-neutral-600">Note courte</span>
-            </label>
-            <label class="flex cursor-pointer items-center gap-2">
-              <input
-                v-model="playMode"
-                type="radio"
-                value="sustain"
-                class="size-4 accent-neutral-800"
-              />
-              <span class="text-sm text-neutral-600">Note tenue</span>
             </label>
           </div>
         </div>
