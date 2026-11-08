@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import Carre from './components/Carre.vue'
 import HelpSections from './components/HelpSections.vue'
+import ShortcutKey from './components/ShortcutKey.vue'
 import {
   noteName,
   pitchClassName,
@@ -2154,7 +2155,9 @@ const showPositionSettings = ref(false)
         <div class="flex flex-col gap-6">
         <!-- Labels -->
         <div class="flex flex-col gap-3">
-          <span class="text-sm font-medium tracking-wide text-neutral-600">Libellés</span>
+          <span class="text-sm font-medium tracking-wide text-neutral-600"
+            >Libellés<ShortcutKey>F1 … F4</ShortcutKey></span
+          >
           <div class="flex flex-wrap gap-x-6 gap-y-2">
             <label class="flex cursor-pointer items-center gap-2">
               <input
@@ -2223,7 +2226,11 @@ const showPositionSettings = ref(false)
           </div>
 
           <!-- Label scope (applies to intervals and numbers alike) -->
-          <div v-if="labelMode !== 'none'" class="flex flex-wrap gap-x-6 gap-y-2 pt-1">
+          <div v-if="labelMode !== 'none'" class="flex flex-col gap-2 pt-1">
+          <span class="text-sm font-medium tracking-wide text-neutral-600">
+            Affichage des libellés<ShortcutKey>L</ShortcutKey>
+          </span>
+          <div class="flex flex-wrap gap-x-6 gap-y-2">
             <label class="flex cursor-pointer items-center gap-2">
               <input
                 v-model="labelScope"
@@ -2252,11 +2259,12 @@ const showPositionSettings = ref(false)
               <span class="text-sm text-neutral-600">Notes sélectionnées seulement</span>
             </label>
           </div>
+          </div>
 
           <!-- Accidentals: affects every note name shown in the app -->
           <div class="flex flex-col gap-2 pt-1">
             <span class="text-sm font-medium tracking-wide text-neutral-600">
-              Affichage des altérations
+              Affichage des altérations<ShortcutKey>A</ShortcutKey>
             </span>
             <div class="flex flex-wrap gap-x-6 gap-y-2">
               <label class="flex cursor-pointer items-center gap-2">
@@ -2283,7 +2291,7 @@ const showPositionSettings = ref(false)
           <!-- Spelling of the three ambiguous intervals, one pair per row -->
           <div class="flex flex-col gap-2 pt-1">
             <span class="text-sm font-medium tracking-wide text-neutral-600">
-              Affichage des intervalles
+              Affichage des intervalles<ShortcutKey>I</ShortcutKey>
             </span>
             <div
               v-for="choice in INTERVAL_CHOICES"
@@ -2386,7 +2394,7 @@ const showPositionSettings = ref(false)
             class="size-4 accent-neutral-800"
           />
           <span class="text-sm font-medium tracking-wide text-neutral-600">
-            Mettre en évidence les 1
+            Mettre en évidence les 1<ShortcutKey>U</ShortcutKey>
           </span>
         </label>
 
@@ -2413,7 +2421,7 @@ const showPositionSettings = ref(false)
             class="size-4 accent-neutral-800"
           />
           <span class="text-sm font-medium tracking-wide text-neutral-600">
-            Bandeau glissando
+            Bandeau glissando<ShortcutKey>G</ShortcutKey>
           </span>
         </label>
 
@@ -2426,7 +2434,7 @@ const showPositionSettings = ref(false)
             class="size-4 accent-neutral-800"
           />
           <span class="text-sm font-medium tracking-wide text-neutral-600">
-            Afficher les notes
+            Afficher les notes<ShortcutKey>F5</ShortcutKey>
           </span>
         </label>
 
@@ -2439,7 +2447,7 @@ const showPositionSettings = ref(false)
             class="size-4 accent-neutral-800"
           />
           <span class="text-sm font-medium tracking-wide text-neutral-600">
-            Afficher les notes simples
+            Afficher les notes simples<ShortcutKey>F6</ShortcutKey>
           </span>
         </label>
 
@@ -2452,7 +2460,7 @@ const showPositionSettings = ref(false)
             class="size-4 accent-neutral-800"
           />
           <span class="text-sm font-medium tracking-wide text-neutral-600">
-            Afficher les fréquences
+            Afficher les fréquences<ShortcutKey>F7</ShortcutKey>
           </span>
         </label>
 
@@ -2465,7 +2473,9 @@ const showPositionSettings = ref(false)
               type="checkbox"
               class="size-4 accent-neutral-800"
             />
-            <span class="text-sm font-medium tracking-wide text-neutral-600">Mode piano</span>
+            <span class="text-sm font-medium tracking-wide text-neutral-600"
+              >Mode piano<ShortcutKey>P</ShortcutKey></span
+            >
           </label>
           <label
             v-if="pianoMode"
@@ -2478,7 +2488,9 @@ const showPositionSettings = ref(false)
               type="checkbox"
               class="size-4 accent-neutral-800"
             />
-            <span class="text-sm text-neutral-600">Réaliste</span>
+            <span class="text-sm text-neutral-600"
+              >Réaliste<ShortcutKey>Ctrl + P</ShortcutKey></span
+            >
           </label>
         </div>
 
@@ -2491,7 +2503,9 @@ const showPositionSettings = ref(false)
               type="checkbox"
               class="size-4 accent-neutral-800"
             />
-            <span class="text-sm font-medium tracking-wide text-neutral-600">Drone</span>
+            <span class="text-sm font-medium tracking-wide text-neutral-600"
+              >Drone<ShortcutKey>D</ShortcutKey></span
+            >
           </label>
 
           <!-- Drone note and volume (only relevant when the drone is on) -->
@@ -2645,7 +2659,7 @@ const showPositionSettings = ref(false)
           <!-- Highlight scope (only relevant when a scale is selected) -->
           <div v-if="selectedScale" class="flex flex-col gap-2 pt-2">
             <span class="text-sm font-medium tracking-wide text-neutral-600">
-              Mise en évidence
+              Mise en évidence<ShortcutKey>M</ShortcutKey>
             </span>
             <label class="flex cursor-pointer items-center gap-2">
               <input
@@ -2681,7 +2695,9 @@ const showPositionSettings = ref(false)
                 type="checkbox"
                 class="size-4 accent-neutral-800"
               />
-              <span class="text-sm text-neutral-600">Masquer les libellés hors sélection</span>
+              <span class="text-sm text-neutral-600"
+                >Masquer les libellés hors sélection<ShortcutKey>K</ShortcutKey></span
+              >
             </label>
 
             <label class="flex cursor-pointer items-center gap-2">
@@ -2690,7 +2706,9 @@ const showPositionSettings = ref(false)
                 type="checkbox"
                 class="size-4 accent-neutral-800"
               />
-              <span class="text-sm text-neutral-600">Masquer les notes hors sélection</span>
+              <span class="text-sm text-neutral-600"
+                >Masquer les notes hors sélection<ShortcutKey>N</ShortcutKey></span
+              >
             </label>
 
             <!-- Degrees only apply to a scale, not to an interval or a chord -->
@@ -2700,14 +2718,18 @@ const showPositionSettings = ref(false)
                 type="checkbox"
                 class="size-4 accent-neutral-800"
               />
-              <span class="text-sm text-neutral-600">Afficher les degrés</span>
+              <span class="text-sm text-neutral-600"
+                >Afficher les degrés<ShortcutKey>F8</ShortcutKey></span
+              >
             </label>
           </div>
         </div>
 
         <!-- Play mode -->
         <div class="flex flex-col gap-3">
-          <span class="text-sm font-medium tracking-wide text-neutral-600">Mode de jeu</span>
+          <span class="text-sm font-medium tracking-wide text-neutral-600"
+            >Mode de jeu<ShortcutKey>T</ShortcutKey></span
+          >
           <div class="flex flex-wrap gap-x-6 gap-y-2">
             <label class="flex cursor-pointer items-center gap-2">
               <input
