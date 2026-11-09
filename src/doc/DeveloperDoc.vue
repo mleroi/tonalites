@@ -249,6 +249,14 @@ const SETTINGS = [
     notes: 'Seulement avec une gamme à sept notes.',
   },
   {
+    name: 'showSteps',
+    label: 'Voir les intervalles entre notes',
+    where: DETAILED,
+    values: BOOLEAN,
+    notes:
+      'Une flèche courbe sous les cases entre chaque note sélectionnée et la suivante, avec l’écart en tons (« ton », « demi-ton »…). Seulement avec une sélection mise en évidence (pas avec `scaleHighlightMode: \'none\'`).',
+  },
+  {
     name: 'playMode',
     label: 'Mode de jeu',
     where: DETAILED,

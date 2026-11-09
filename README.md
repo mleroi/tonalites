@@ -70,6 +70,10 @@ that, several layers help you read what you hear:
   sets the reference note, the major scale and the right accidentals in one go.
 - **Scale degrees** ("Afficher les degrés") written in Roman numerals below
   each note of a seven-note scale.
+- **Gaps between notes** ("Voir les intervalles entre notes"): below the
+  squares, a curved arrow from each highlighted note of the selection to the
+  next, with the gap written in tones ("ton", "demi-ton", "1 ton ½"…) — so the
+  tone/semitone pattern of a scale can be read at a glance.
 - **Chord-listening mode** ("Entendre les accords"), for a seven-note scale:
   hovering a scale note plays the diatonic chord built on it — three, four or
   five notes, stacked in thirds — instead of the single note. Every note of the
@@ -94,7 +98,9 @@ that, several layers help you read what you hear:
   in the pointer's column following the pointer.
 - **Keyboard shortcuts**, all listed in a help dialog opened with `h`: among
   them, `F1`–`F4` pick the label mode, from "Numérotation" to "Degrés"
-  (pressing again the key of the current mode goes back to "Aucun"), `Space`
+  (pressing again the key of the current mode goes back to "Aucun"), `F5`–`F9`
+  toggle what is written below the squares, `Ctrl + ←` / `Ctrl + →` move the
+  "note du 1" a semitone down / up, `Space`
   plays the marked notes for as long as it is held (`Ctrl + Space` as an
   arpeggio), `t` switches between sustained and short notes, `d` starts or
   stops the drone, `n` and `k` hide the notes and the labels outside the

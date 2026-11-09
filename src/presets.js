@@ -62,6 +62,8 @@
 //   hideLabelsOutOfScale  true / false
 //   hideNotesOutOfScale   true / false
 //   showDegrees      true / false
+//   showSteps        true / false (the gaps between the selected notes,
+//                    drawn as arcs below the squares)
 //   playMode         'short' | 'sustain'
 //   instrumentKey    '' (synth) or a key of INSTRUMENTS in instruments.js
 //   keyChoice        '' (none) or a key of KEYS in notes.js; unlike choosing
@@ -97,6 +99,7 @@ export const PRESETS = [
       hideLabelsOutOfScale: true,
       hideNotesOutOfScale: false,
       showDegrees: false,
+      showSteps: false,
       playMode: 'sustain',
       instrumentKey: 'piano',
       keyChoice: '',
@@ -214,15 +217,16 @@ export const PRESETS = [
     settings: {
       instrumentKey: 'piano',
       playMode: 'sustain',
-      octaves: 2,
+      octaves: 3,
       numberStart: 36,
-      firstNote: 36,
+      firstNote: 24,
       labelScope: 'all',
       scaleKey: 'ionian',
       labelMode: 'intervals',
       scaleAudioMode: 'scale-only',
-      scaleHighlightMode: 'all',
+      scaleHighlightMode: 'single',
       showGlide: false,
+      showSteps: true,
     },
     free: 'all',
   },
@@ -270,14 +274,15 @@ export const PRESETS = [
     settings: {
       instrumentKey: 'piano',
       playMode: 'sustain',
-      octaves: 2,
+      octaves: 3,
       numberStart: 36,
-      firstNote: 36,
+      firstNote: 24,
       labelScope: 'all',
       scaleKey: 'c-maj',
       labelMode: 'intervals',
-      scaleHighlightMode: 'all',
+      scaleHighlightMode: 'single',
       showGlide: false,
+      showSteps: true,
     },
     variants: [
       {

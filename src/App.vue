@@ -217,6 +217,11 @@ const selectedScale = computed(() => SCALES.find((s) => s.key === scaleKey.value
 // Whether to write each scale note's degree in Roman numerals below its square.
 const showDegrees = ref(defaults.showDegrees)
 
+// "Voir les intervalles entre notes": below the squares, a curved arrow from
+// each selected note to the next, with the gap between them in tones (see
+// steps). Any selection will do: a scale, an interval or a chord.
+const showSteps = ref(defaults.showSteps)
+
 // True when the selection is one of the seven-note scales. Both the degrees
 // and the chord-listening mode depend on this: intervals and chords are not
 // numbered in degrees, and a pentatonic's degrees are named after the diatonic
@@ -924,6 +929,125 @@ function anchorZoom(clientX, oldCount, newCount) {
   firstNote.value = Math.max(MIN_NOTE, Math.min(MAX_NOTE, first))
 }
 
+// Width of the notes row in pixels, kept up to date as the window is resized:
+// the arcs between the selected notes are drawn in pixels, so they need it to
+// find the squares.
+const notesRowWidth = ref(0)
+let notesRowObserver = null
+onMounted(() => {
+  notesRowObserver = new ResizeObserver(([entry]) => {
+    notesRowWidth.value = entry.contentRect.width
+  })
+  notesRowObserver.observe(notesRow.value)
+})
+onUnmounted(() => notesRowObserver?.disconnect())
+
+// Whether the arcs can be shown at all: they link the highlighted notes, so
+// they need a selection, highlighted. With no highlight, they are hidden along
+// with their checkbox, the setting itself being left as it is.
+const stepsAvailable = computed(
+  () => selectedScale.value !== null && scaleHighlightMode.value !== 'none',
+)
+
+// The selected notes linked by the arcs, from low to high. With the highlight
+// on a single octave, the selection itself from the "note du 1" — the scales
+// already end on the octave above their tonic (see notes.js), so their last
+// step shows too (Si to Do in Do major). Otherwise, every note of the
+// selection in view. Only the notes whose square is displayed are kept.
+const stepNotes = computed(() => {
+  const scale = selectedScale.value
+  if (!stepsAvailable.value || !showSteps.value) return []
+  const shown = new Set(carres.value.map((i) => firstNote.value + i))
+  if (scaleHighlightMode.value !== 'single') return [...shown].filter(inScale)
+  return scale.intervals
+    .map((d) => numberStart.value + d)
+    .filter((n) => shown.has(n))
+})
+
+// Horizontal center of the square `offset` semitones from the first note, in
+// pixels from the left of the notes row, given the width of a square: the
+// same geometry as the row itself, squares sharing it evenly, or the keyboard
+// columns centered in it (see keyboardWidthCss).
+function squareCenter(offset, squareWidth) {
+  if (realisticLayout.value) {
+    const width = (keyboardColumns.value / 2) * (squareWidth + SQUARE_GAP)
+    const column = keyboardKeys.value[offset].column
+    return (notesRowWidth.value - width) / 2 + ((column + 1) / keyboardColumns.value) * width
+  }
+  return carres.value.indexOf(offset) * (squareWidth + SQUARE_GAP) + squareWidth / 2
+}
+
+// A gap of `semitones` in tones, as written below its arc: "demi-ton", "ton",
+// then "1 ton ½", "2 tons"… or, `short`, the number of tones alone: "½", "1",
+// "1½"…
+function stepLabel(semitones, short) {
+  const tones = Math.floor(semitones / 2)
+  const half = semitones % 2 === 1
+  if (short) return `${tones || ''}${half ? '½' : ''}`
+  if (semitones === 1) return 'demi-ton'
+  if (semitones === 2) return 'ton'
+  return `${tones} ton${tones > 1 ? 's' : ''}${half ? ' ½' : ''}`
+}
+
+// Clockwise tilt of the arrowheads (the SVG y axis pointing down, a positive
+// rotation turns clockwise on screen).
+const ARROW_TILT = (20 * Math.PI) / 180
+const ARROW_TILT_COS = Math.cos(ARROW_TILT)
+const ARROW_TILT_SIN = Math.sin(ARROW_TILT)
+
+// The arcs below the squares, one from each selected note to the next, in
+// pixels: each is a curve hanging from the center of the first square to the
+// center of the second, ending in an arrowhead, with the gap written below
+// it. Their depth and text grow with the squares, within bounds. A label too
+// wide for its arc is shortened, and dropped if even that does not fit, so
+// that neighbouring labels never run into each other. Null when there is
+// nothing to draw.
+const steps = computed(() => {
+  const notes = stepNotes.value
+  if (notes.length < 2 || notesRowWidth.value <= 0) return null
+  const count = Math.max(1, carres.value.length)
+  const squareWidth = (notesRowWidth.value - (count - 1) * SQUARE_GAP) / count
+  const fontSize = Math.min(16, Math.max(9, squareWidth * 0.22))
+  const depth = Math.min(24, Math.max(8, squareWidth * 0.3))
+  const arrow = Math.min(5, depth * 0.35)
+  // Room above the curves for the arrowheads' stroke, and between the curves
+  // and the labels.
+  const top = 2
+  const textGap = 4
+  // Rough width of a text, the font's characters being about this wide.
+  const textWidth = (text) => text.length * fontSize * 0.55
+  const arcs = []
+  for (let k = 1; k < notes.length; k++) {
+    const from = squareCenter(notes[k - 1] - firstNote.value, squareWidth)
+    const to = squareCenter(notes[k] - firstNote.value, squareWidth)
+    // Kept slightly apart from the next arc, which starts where this one ends.
+    const inset = Math.min(3, (to - from) * 0.08)
+    const x1 = from + inset
+    const x2 = to - inset
+    const semitones = notes[k] - notes[k - 1]
+    const room = to - from - 4
+    let label = stepLabel(semitones, false)
+    if (textWidth(label) > room) label = stepLabel(semitones, true)
+    if (textWidth(label) > room) label = null
+    // Both control points straight below the ends: the curve leaves and
+    // reaches the squares vertically, and dips to 3/4 of their depth.
+    const control = top + (depth * 4) / 3
+    // The arrowhead's two wings, from its tip: tilted by ARROW_TILT, so that
+    // the head follows the curve coming up rather than pointing straight up.
+    const wing = (dx, dy) =>
+      `${x2 + dx * ARROW_TILT_COS - dy * ARROW_TILT_SIN} ${top + dx * ARROW_TILT_SIN + dy * ARROW_TILT_COS}`
+    arcs.push({
+      key: notes[k],
+      path: `M ${x1} ${top} C ${x1} ${control}, ${x2} ${control}, ${x2} ${top}`,
+      arrow: `M ${wing(-arrow, arrow * 1.2)} L ${x2} ${top} L ${wing(arrow, arrow * 1.2)}`,
+      labelX: (x1 + x2) / 2,
+      label,
+    })
+  }
+  const labelY = top + depth + textGap + fontSize * 0.8
+  return { arcs, fontSize, labelY, height: labelY + fontSize * 0.3 }
+})
+
 function clearMarks() {
   markedNotes.value.clear()
 }
@@ -975,13 +1099,14 @@ const LABEL_MODE_KEYS = { F1: 'numbers', F2: 'intervals', F3: 'names', F4: 'degr
 // to "Aucun".
 const NUMBERS_CYCLE = { numbers: 'semitones', semitones: 'tones', tones: 'none' }
 
-// What is written below the squares, toggled with F5..F8 in the order of the
+// What is written below the squares, toggled with F5..F9 in the order of the
 // checkboxes.
 const BELOW_SQUARE_KEYS = {
   F5: showNotes,
   F6: showSimpleNotes,
   F7: showFrequencies,
   F8: showDegrees,
+  F9: showSteps,
 }
 
 // Label scopes in the order of their radio buttons, each leading to the next,
@@ -1000,9 +1125,12 @@ const HIGHLIGHT_MODE_CYCLE = { single: 'all', all: 'none', none: 'single' }
 //            button, "Degrés" is only there with a seven-note scale. F1 goes
 //            from "Numérotation" to "Nombre de demi-tons", "Nombre de tons",
 //            then to "Aucun"
-//   F5..F8   below the squares: notes, simple notes, frequencies, degrees
-//            on/off. The degrees only with a seven-note scale, as above; F5
-//            no longer reloads the page (Ctrl + F5 still does)
+//   F5..F9   below the squares: notes, simple notes, frequencies, degrees,
+//            gaps between the selected notes on/off. The degrees only with a
+//            seven-note scale, as above, and the gaps only with a highlighted
+//            selection, like their checkboxes; F5 no longer reloads the page (Ctrl + F5
+//            still does)
+//   Ctrl + Left / Right   "note du 1" a semitone down / up
 //   d       drone on/off
 //   l        labels on a single octave, then every octave, then the marked
 //            notes only (the scale highlight is left as it is)
@@ -1022,7 +1150,7 @@ const HIGHLIGHT_MODE_CYCLE = { single: 'all', all: 'none', none: 'single' }
 //   p        piano mode on/off; with Ctrl, the realistic piano on/off, which
 //            also turns the piano mode on (instead of printing the page)
 // Left alone when Ctrl, Alt or Cmd is held, so as not to steal the browser's
-// own shortcuts — but for Ctrl + Space and Ctrl + P. They work even when a dropdown has the focus — which it keeps
+// own shortcuts — but for Ctrl + Space, Ctrl + P and Ctrl + arrows. They work even when a dropdown has the focus — which it keeps
 // after an option is picked, a preset for instance — so the key is then kept
 // from also selecting the option starting with that letter. Auto-repeat is
 // ignored, so holding a key does not toggle it on and off.
@@ -1088,8 +1216,9 @@ const LETTER_SHORTCUTS = {
 // The shortcuts above, as listed in the help dialog: keep both in step.
 const SHORTCUT_HELP = [
   ['F1 … F4', 'Libellés : numérotation (puis demi-tons, tons), intervalles, nom des notes, degrés (même touche : aucun)'],
-  ['F5 … F8', 'Sous les cases : notes, notes simples, fréquences, degrés'],
+  ['F5 … F9', 'Sous les cases : notes, notes simples, fréquences, degrés, intervalles entre notes'],
   ['L', 'Libellés : une octave, toutes les octaves, notes sélectionnées seulement'],
+  ['Ctrl + ← / →', 'Note du 1 : un demi-ton plus bas / plus haut'],
   ['U', 'Mettre en évidence les 1'],
   ['D', 'Drone'],
   ['T', 'Note tenue, ou courte'],
@@ -1183,6 +1312,15 @@ function onKeydown(e) {
     }
     return
   }
+  // Ctrl + Left / Right moves the "note du 1" a semitone down / up, within
+  // the range of its slider. Auto-repeat is kept: holding the key walks it
+  // along. Also keeps the browser from moving the caret word by word.
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && e.ctrlKey && !e.altKey && !e.metaKey) {
+    e.preventDefault()
+    const n = numberStart.value + (e.key === 'ArrowRight' ? 1 : -1)
+    numberStart.value = Math.max(MIN_NUMBER_START, Math.min(MAX_NUMBER_START, n))
+    return
+  }
   if (e.ctrlKey || e.altKey || e.metaKey) return
   const mode = LABEL_MODE_KEYS[e.key]
   const below = BELOW_SQUARE_KEYS[e.key]
@@ -1198,6 +1336,7 @@ function onKeydown(e) {
     else labelMode.value = labelMode.value === mode ? 'none' : mode
   } else if (below) {
     if (below === showDegrees && !sevenNoteScale.value) return
+    if (below === showSteps && !stepsAvailable.value) return
     below.value = !below.value
   } else {
     letter()
@@ -1378,6 +1517,7 @@ const SETTINGS = {
   hideLabelsOutOfScale,
   hideNotesOutOfScale,
   showDegrees,
+  showSteps,
   playMode,
   instrumentKey,
   keyChoice,
@@ -1714,6 +1854,35 @@ const showPositionSettings = ref(false)
             />
           </TransitionGroup>
         </div>
+
+        <!-- The gaps between the selected notes: a curved arrow from each one
+             to the next, drawn in the pixels of the notes row (see steps) -->
+        <svg
+          v-if="steps"
+          class="block w-full select-none overflow-visible"
+          :height="steps.height"
+          aria-hidden="true"
+        >
+          <g v-for="arc in steps.arcs" :key="arc.key">
+            <path
+              :d="`${arc.path} ${arc.arrow}`"
+              class="fill-none stroke-indigo-400"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <text
+              v-if="arc.label"
+              :x="arc.labelX"
+              :y="steps.labelY"
+              :font-size="steps.fontSize"
+              text-anchor="middle"
+              class="fill-neutral-500"
+            >
+              {{ arc.label }}
+            </text>
+          </g>
+        </svg>
 
         <!-- What the chord under the pointer is, and how it is built: the two
              sit close together so they read as one block, away from the row
@@ -2409,7 +2578,7 @@ const showPositionSettings = ref(false)
         <div class="flex flex-col gap-3">
           <div class="flex items-baseline justify-between">
             <label for="number-start" class="text-sm font-medium tracking-wide text-neutral-600">
-              Note du « 1 »
+              Note du « 1 »<ShortcutKey>Ctrl + ← / →</ShortcutKey>
             </label>
             <span class="text-sm tabular-nums text-neutral-400">{{ numberStartName }}</span>
           </div>
@@ -2786,6 +2955,18 @@ const showPositionSettings = ref(false)
               />
               <span class="text-sm text-neutral-600"
                 >Afficher les degrés<ShortcutKey>F8</ShortcutKey></span
+              >
+            </label>
+
+            <!-- The gaps link the highlighted notes: none with no highlight -->
+            <label v-if="stepsAvailable" class="flex cursor-pointer items-center gap-2">
+              <input
+                v-model="showSteps"
+                type="checkbox"
+                class="size-4 accent-neutral-800"
+              />
+              <span class="text-sm text-neutral-600"
+                >Voir les intervalles entre notes<ShortcutKey>F9</ShortcutKey></span
               >
             </label>
           </div>
